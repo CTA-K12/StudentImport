@@ -345,13 +345,13 @@ function New-Password {
 		[System.String]$Office,
 		[Parameter(Mandatory = $true,
 				   ValueFromPipelineByPropertyName = $true)]
-		[string]$DateOfBirth,
+		[System.String]$DateOfBirth,
 		[Parameter(Mandatory = $true,
 				   ValueFromPipelineByPropertyName = $true)]
-		[System.Int16]$Grade,
+		[System.String]$Grade,
 		[Parameter(Mandatory = $true,
 				   ValueFromPipelineByPropertyName = $true)]
-		[string]$District,
+		[System.String]$District,
 		[Parameter(Mandatory = $true,
 				   ValueFromPipelineByPropertyName = $true)]
 		[array]$Words,
@@ -363,22 +363,22 @@ function New-Password {
 		[array]$SpecialCharacters,
 		[Parameter(Mandatory = $true,
 				   ValueFromPipelineByPropertyName = $true)]
-		[string]$DefaultPassword,
+		[System.String]$DefaultPassword,
 		[Parameter(Mandatory = $true,
 				   ValueFromPipelineByPropertyName = $true)]
-		[boolean]$UseDefaultPassword,
+		[System.Boolean]$UseDefaultPassword,
 		[Parameter(Mandatory = $true,
 				   ValueFromPipelineByPropertyName = $true)]
-		[string]$EmployeeID,
+		[System.String]$EmployeeID,
 		[Parameter(Mandatory = $true,
 				   ValueFromPipelineByPropertyName = $true)]
-		[boolean]$DefaultPasswordIsStudentID,
+		[System.Boolean]$DefaultPasswordIsStudentID,
 		[Parameter(Mandatory = $true,
 				   ValueFromPipelineByPropertyName = $true)]
-		[System.Int16]$DOBPasswordGrade,
+		[System.String]$DOBPasswordGrade,
 		[Parameter(Mandatory = $true,
 				   ValueFromPipelineByPropertyName = $true)]
-		$DOBPasswordLocations
+		[System.String]$DOBPasswordLocations
 	)
 	
 	BEGIN { Write-Verbose "BEGIN $($MyInvocation.MyCommand)" }
@@ -405,8 +405,8 @@ function New-Password {
 		} # End of switch
 		
 		$properties = @{
-			Password		 = $password
-			PasswordCrypt    = (ConvertTo-SecureString $($password) -AsPlainText -Force)
+			Password	  = $password
+			PasswordCrypt = (ConvertTo-SecureString $($password) -AsPlainText -Force)
 		}
 		
 		$obj = New-Object -TypeName PSObject -Property $properties
@@ -829,7 +829,7 @@ function Read-ConfigXML {
 			$properties = @{
 				UPNSuffix	  = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig" | Select-Object –ExpandProperty Node).UPNSuffix
 				EmailSuffix   = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig" | Select-Object –ExpandProperty Node).EmailSuffix
-				studentsOUs   = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location" | Select-Object –ExpandProperty Node).Path
+				studentsOUs   = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location" | Select-Object –ExpandProperty Node).Path | Get-Unique
 				Locations	  = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location" | Select-Object –ExpandProperty Node)
 				SkipGrades    = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Skip/Grades" | Select-Object –ExpandProperty Node).Grade
 				SkipLocations = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Skip/Locations" | Select-Object –ExpandProperty Node).Location
@@ -1335,8 +1335,8 @@ Remove-PSDrive -Name Script
 # SIG # Begin signature block
 # MIId7QYJKoZIhvcNAQcCoIId3jCCHdoCAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCAE2025Fxek4THf
-# W5Oi5Beb6iRRKur5wKfucMZPx6ancKCCGK8wggPQMIICuKADAgECAhBWDzlgMpdv
+# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCBs9GNup48IJ2vt
+# iJq8V29x5S5G96xFn8GUh4qBzsPvlaCCGK8wggPQMIICuKADAgECAhBWDzlgMpdv
 # skWlu9PmVks2MA0GCSqGSIb3DQEBCwUAMFoxEzARBgoJkiaJk/IsZAEZFgNvcmcx
 # GzAZBgoJkiaJk/IsZAEZFgtjYXNjYWRldGVjaDEVMBMGCgmSJomT8ixkARkWBWlu
 # dHJhMQ8wDQYDVQQDEwZDVEEtQ0EwHhcNMTUwODE4MjIwMDI3WhcNMzUwODE4MjIy
@@ -1472,25 +1472,25 @@ Remove-PSDrive -Name Script
 # GQYKCZImiZPyLGQBGRYLY2FzY2FkZXRlY2gxFTATBgoJkiaJk/IsZAEZFgVpbnRy
 # YTETMBEGA1UEAxMKQ1RBLUlOVC1DQQITTQAACNTm6lyP5isnXwAAAAAI1DANBglg
 # hkgBZQMEAgEFAKBMMBkGCSqGSIb3DQEJAzEMBgorBgEEAYI3AgEEMC8GCSqGSIb3
-# DQEJBDEiBCBsUqvr5DgCkTVjPy9u0lBUxrNppQw9OfdK6plbg5/HqTANBgkqhkiG
-# 9w0BAQEFAASCAQBJdw6aMLoyBJO7wElJ4iLBQ+3UWz2ZHoctlxe91BdF3GBxi9R4
-# kyvM6S78BXhoK4kqgDXTVNRnK/SdJo0JST17Vbinxru832IRTXfncLTeBfh3kBfF
-# Bz2ru3DIACh3tmjKgCQVDDJ7iI/fLDlflDppJiSt55EJaykusng9HN/Jv/MAu9ZH
-# rV3oiALS3nATA13cn9uRip4guSZigDN6FVyR8tydRAFnY2D02PAToXMxvMMYymqa
-# IZyBUB8464SDj4pI+nnF6HZ6zMCQ2HKRSxTnX6FyDsQ2m1C09u9RYuBjuxx5L1pf
-# YBKKsEr34VMqk9UaAtblHXf+UEFd+pe0JVysoYICojCCAp4GCSqGSIb3DQEJBjGC
+# DQEJBDEiBCDIdAgejoe5t2Uy395gJ/cPJR1vSVewa8fTt8UOnxznazANBgkqhkiG
+# 9w0BAQEFAASCAQCQTY6rnVPFPUaycU54r8+GZfP0uoShildTTYpAGHFwnca9U1Ux
+# ZThsb6Ubi0cz06mNMBjehr0kAO+KrhFt7dq/sSOu+Jg0Gh+2sw6gAcyxLHLvv0Ul
+# ohm/9zps/BkMQ6PPW+G+NfjAespTeB6e/EkSwqOQsOl6fiNbuwaazS3Gn/cq3F0+
+# 18TmXhhfXj4tS7oYlQkl01i/Qfn9DeKiCZ1L6jWFwifecac+C96UKeHT8kVREBn+
+# UxMVytOXiAn0+ZjSsZo6T5acpnH5QU0MhaHe2A3QCpwjh/eopZ1mJ4YYbRC5xdkY
+# l/RgLMnHMbFLNl0lk0jzfsYdzrJjiTWId22uoYICojCCAp4GCSqGSIb3DQEJBjGC
 # Ao8wggKLAgEBMGgwUjELMAkGA1UEBhMCQkUxGTAXBgNVBAoTEEdsb2JhbFNpZ24g
 # bnYtc2ExKDAmBgNVBAMTH0dsb2JhbFNpZ24gVGltZXN0YW1waW5nIENBIC0gRzIC
 # EhEh1pmnZJc+8fhCfukZzFNBFDAJBgUrDgMCGgUAoIH9MBgGCSqGSIb3DQEJAzEL
-# BgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTE4MDkwNDIyMjE0MlowIwYJKoZI
-# hvcNAQkEMRYEFIMVbB8Hu5jhNYhfnJZpxzV7qO7JMIGdBgsqhkiG9w0BCRACDDGB
+# BgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTE4MDkwNjIxMDkxNlowIwYJKoZI
+# hvcNAQkEMRYEFCAEzudwN+kVtEIhBSm/poY/9e6JMIGdBgsqhkiG9w0BCRACDDGB
 # jTCBijCBhzCBhAQUY7gvq2H1g5CWlQULACScUCkz7HkwbDBWpFQwUjELMAkGA1UE
 # BhMCQkUxGTAXBgNVBAoTEEdsb2JhbFNpZ24gbnYtc2ExKDAmBgNVBAMTH0dsb2Jh
 # bFNpZ24gVGltZXN0YW1waW5nIENBIC0gRzICEhEh1pmnZJc+8fhCfukZzFNBFDAN
-# BgkqhkiG9w0BAQEFAASCAQAvMoMB5gnj0Cf7nRhJBrCpanIoIna/oEr5OJ3T2HI+
-# 8pLRnUfnLL72YELUaFOZjNvBaD+HNX5ArpKaOmONvqtUER5534KASKIJxWeDUfPM
-# +NWaFXPxwYmWDQMEKGFtFCnXdM7EEUv3cIpIOS6hViHPl3K2BBpzTobM4S9MdBX3
-# ZIfY80p3oLxkNKMYNwBpwDp7nP1lLKX8NxgqTSLr4EwmYrTa9yUOkeSjSi/boZLk
-# DTYygNo6XvvGDDZvKP0iOTKTwaKT/BxI6L+MiAm+FpCZYoz9c7zFBMEQtpk0IFyd
-# IrkF51BWzzYR1uj20OLkhXsGjCtwEQyyQWNgWaDu4cDI
+# BgkqhkiG9w0BAQEFAASCAQAXdSglL6ZWuBW/hqiRg5uRb2+Y8mginRvv3LRd1CBW
+# iLReCUTnQhgtpnpt2y7LnbeXVYFnK2bxZwRuFV58j80L9+OY7RPHKza5EjY2s6AZ
+# JB0VqtHLrMy1oL78PEKsMe+6DGNYayXF+6RDN9t8qRafyuPzLqZojCNPnwKBD5Wq
+# tj6Q9HZF6nwHaGR4o3SYB8ZXBjlBWliKnA0hEWSJofJ5otv0xJ//L8ywLUICQKil
+# etyJo+7Pq6XI6CQO9FK1D1U4jAxAPQJesfXpB34zWzdEZ+ROLaUBiXn51t6uFH/1
+# roLaITdQf09kTQsduy3YXJgAUkDUppfEiu8nBQO3NTfv
 # SIG # End signature block
