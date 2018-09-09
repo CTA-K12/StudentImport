@@ -1193,6 +1193,46 @@ function Update-ExistingUser {
 	}
 	END { Write-Verbose "END $($MyInvocation.MyCommand)" }
 }
+function Write-LogEntry {
+	param
+	(
+		[Parameter(Mandatory = $true,
+				   HelpMessage = 'Value added to the log file.')]
+		[ValidateNotNullOrEmpty()]
+		[string]$Value,
+		[Parameter(Mandatory = $true,
+				   HelpMessage = 'Severity for the log entry. 1 for Informational, 2 for Warning and 3 for Error.')]
+		[ValidateSet('1', '2', '3')]
+		[ValidateNotNullOrEmpty()]
+		[string]$Severity,
+		[Parameter(Mandatory = $false,
+				   HelpMessage = 'Name of the log file that the entry will written to.')]
+		[ValidateNotNullOrEmpty()]
+		[string]$FileName = "StudentImport.log"
+	)
+	
+	# Determine log file location
+	$global:LogFilePath = Join-Path -Path 'Script:\Files' -ChildPath $FileName
+	
+	# Construct time stamp for log entry
+	$Time = -join @((Get-Date -Format "HH:mm:ss.fff"), "+", (Get-WmiObject -Class Win32_TimeZone | Select-Object -ExpandProperty Bias))
+	
+	# Construct date for log entry
+	$Date = (Get-Date -Format "MM-dd-yyyy")
+	
+	# Construct context for log entry
+	$Context = $([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)
+	
+	# Construct final log entry
+	$LogText = "<![LOG[$($Value)]LOG]!><time=""$($Time)"" date=""$($Date)"" component=""StudentImport"" context=""$($Context)"" type=""$($Severity)"" thread=""$($PID)"" file="""">"
+	
+	# Add value to log file
+	try {
+		Out-File -InputObject $LogText -Append -NoClobber -Encoding Default -FilePath $global:LogFilePath -ErrorAction Stop
+	} catch [System.Exception] {
+		Write-Warning -Message "Unable to append log entry to $FileName file. Error message: $($_.Exception.Message)"
+	}
+}
 function Write-SynergyExportFile {
 	[CmdletBinding()]
 	param
@@ -1335,8 +1375,8 @@ Remove-PSDrive -Name Script
 # SIG # Begin signature block
 # MIId7QYJKoZIhvcNAQcCoIId3jCCHdoCAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCBs9GNup48IJ2vt
-# iJq8V29x5S5G96xFn8GUh4qBzsPvlaCCGK8wggPQMIICuKADAgECAhBWDzlgMpdv
+# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCCxRtTPf8+Fqpd2
+# 8IakEF9Da0o6vj1LNpxqhZ0OPma50KCCGK8wggPQMIICuKADAgECAhBWDzlgMpdv
 # skWlu9PmVks2MA0GCSqGSIb3DQEBCwUAMFoxEzARBgoJkiaJk/IsZAEZFgNvcmcx
 # GzAZBgoJkiaJk/IsZAEZFgtjYXNjYWRldGVjaDEVMBMGCgmSJomT8ixkARkWBWlu
 # dHJhMQ8wDQYDVQQDEwZDVEEtQ0EwHhcNMTUwODE4MjIwMDI3WhcNMzUwODE4MjIy
@@ -1472,25 +1512,25 @@ Remove-PSDrive -Name Script
 # GQYKCZImiZPyLGQBGRYLY2FzY2FkZXRlY2gxFTATBgoJkiaJk/IsZAEZFgVpbnRy
 # YTETMBEGA1UEAxMKQ1RBLUlOVC1DQQITTQAACNTm6lyP5isnXwAAAAAI1DANBglg
 # hkgBZQMEAgEFAKBMMBkGCSqGSIb3DQEJAzEMBgorBgEEAYI3AgEEMC8GCSqGSIb3
-# DQEJBDEiBCDIdAgejoe5t2Uy395gJ/cPJR1vSVewa8fTt8UOnxznazANBgkqhkiG
-# 9w0BAQEFAASCAQCQTY6rnVPFPUaycU54r8+GZfP0uoShildTTYpAGHFwnca9U1Ux
-# ZThsb6Ubi0cz06mNMBjehr0kAO+KrhFt7dq/sSOu+Jg0Gh+2sw6gAcyxLHLvv0Ul
-# ohm/9zps/BkMQ6PPW+G+NfjAespTeB6e/EkSwqOQsOl6fiNbuwaazS3Gn/cq3F0+
-# 18TmXhhfXj4tS7oYlQkl01i/Qfn9DeKiCZ1L6jWFwifecac+C96UKeHT8kVREBn+
-# UxMVytOXiAn0+ZjSsZo6T5acpnH5QU0MhaHe2A3QCpwjh/eopZ1mJ4YYbRC5xdkY
-# l/RgLMnHMbFLNl0lk0jzfsYdzrJjiTWId22uoYICojCCAp4GCSqGSIb3DQEJBjGC
+# DQEJBDEiBCCeYMBCC4D2UNT145QiV2yd1S9UAyOcScjErATA5wF6+DANBgkqhkiG
+# 9w0BAQEFAASCAQBwy92KCYgxfrUJrGuD5SyMshAZ6IO2+v7wKrNpW0xFaavKN9ld
+# tmkea6xjrS/OLQCsdalkTG/EjdDz0St6cKpoQE5Lvf7QKgH1OfZII+K5XZePvkR4
+# 0GOY9vm3v8D8wKBlEPN0jerU49dJ4dLpNY9SiBzJqA9EEi1qNMptr02ysBqlRhOm
+# e2QrT4b46uFGU53BkSj9iyw+7xXi0q/W/gOJrMmcGx74k6+73xZAPY4fW7YsVkL3
+# cs0plzf3E1D/UDhCpRFccB98KCH86emx558CFny2+0xEOQNzNX8fQjaBEWKXrLCS
+# u2spl9vGGLe6tIwoo/zZ+7A72Q6R/x6ew6G0oYICojCCAp4GCSqGSIb3DQEJBjGC
 # Ao8wggKLAgEBMGgwUjELMAkGA1UEBhMCQkUxGTAXBgNVBAoTEEdsb2JhbFNpZ24g
 # bnYtc2ExKDAmBgNVBAMTH0dsb2JhbFNpZ24gVGltZXN0YW1waW5nIENBIC0gRzIC
 # EhEh1pmnZJc+8fhCfukZzFNBFDAJBgUrDgMCGgUAoIH9MBgGCSqGSIb3DQEJAzEL
-# BgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTE4MDkwNjIxMDkxNlowIwYJKoZI
-# hvcNAQkEMRYEFCAEzudwN+kVtEIhBSm/poY/9e6JMIGdBgsqhkiG9w0BCRACDDGB
+# BgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTE4MDkwOTE5MTcwOVowIwYJKoZI
+# hvcNAQkEMRYEFIZ23Yy3kICXvtpLCJ/SwfiKFppUMIGdBgsqhkiG9w0BCRACDDGB
 # jTCBijCBhzCBhAQUY7gvq2H1g5CWlQULACScUCkz7HkwbDBWpFQwUjELMAkGA1UE
 # BhMCQkUxGTAXBgNVBAoTEEdsb2JhbFNpZ24gbnYtc2ExKDAmBgNVBAMTH0dsb2Jh
 # bFNpZ24gVGltZXN0YW1waW5nIENBIC0gRzICEhEh1pmnZJc+8fhCfukZzFNBFDAN
-# BgkqhkiG9w0BAQEFAASCAQAXdSglL6ZWuBW/hqiRg5uRb2+Y8mginRvv3LRd1CBW
-# iLReCUTnQhgtpnpt2y7LnbeXVYFnK2bxZwRuFV58j80L9+OY7RPHKza5EjY2s6AZ
-# JB0VqtHLrMy1oL78PEKsMe+6DGNYayXF+6RDN9t8qRafyuPzLqZojCNPnwKBD5Wq
-# tj6Q9HZF6nwHaGR4o3SYB8ZXBjlBWliKnA0hEWSJofJ5otv0xJ//L8ywLUICQKil
-# etyJo+7Pq6XI6CQO9FK1D1U4jAxAPQJesfXpB34zWzdEZ+ROLaUBiXn51t6uFH/1
-# roLaITdQf09kTQsduy3YXJgAUkDUppfEiu8nBQO3NTfv
+# BgkqhkiG9w0BAQEFAASCAQBG08KofGW8iCIzyY5EO1gWS2HY/RBm0xojTSodVmFx
+# aqSM2i/oEEQWryx6cOsdMoS3nYLdN/4ZHoBwN72dkkVSGZnTPffD4RSe4pOUyHTU
+# 6XjGp9tzM4nln9o+i5Bc2RSFp9upbzggW4yASqKvmdDicdsdqpJwkJDMKY9VWDDO
+# j4YNBZvzrUftauIfQhoWiTySxUHuUb211ELghDo5rlVJ22hj1CcHlk25jwPMA4z/
+# vysdWLPRaVfxHvMwpshZHh8FLhFUL9fvXW/7iqxQjw9x2pBBRcSgTdf2w81S0LtR
+# QCr690g8hq2TgZDW8IoqOCH2SKyWiOzquRg6DKe5GtoI
 # SIG # End signature block
