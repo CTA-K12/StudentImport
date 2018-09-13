@@ -56,11 +56,20 @@ function Clear-File {
 		[Alias('Name')]
 		$File
 	)
-	BEGIN { Write-Verbose "BEGIN $($MyInvocation.MyCommand)" }
-	PROCESS {
+	begin {
+		Write-Verbose "Begin $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "Begin $($MyInvocation.MyCommand)"
+		$FunctionStopWatch = [system.diagnostics.stopwatch]::StartNew()
+	}
+	process {
 		foreach ($filename in $File) { if (Test-Path -Path ($PSScriptRoot, '\Files\', $filename -join '')) { Remove-Item ($PSScriptRoot, '\Files\', $filename -join '') -Force -Confirm:$false } }
 	}
-	END { Write-Verbose "END $($MyInvocation.MyCommand)" }
+	end {
+		$FunctionStopWatch.Stop()
+		Write-Verbose "$($MyInvocation.MyCommand) Took $($FunctionStopWatch.Elapsed.TotalMilliseconds) Milliseconds"
+		Write-Verbose "End $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "End $($MyInvocation.MyCommand)"
+	}
 }
 function Get-AllUserDataAD {
 	[CmdletBinding()]
@@ -72,8 +81,12 @@ function Get-AllUserDataAD {
 		[array]$SearchBase
 	)
 	
-	BEGIN { Write-Verbose "BEGIN $($MyInvocation.MyCommand)" }
-	PROCESS {
+	begin {
+		Write-Verbose "Begin $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "Begin $($MyInvocation.MyCommand)"
+		$FunctionStopWatch = [System.Diagnostics.Stopwatch]::StartNew()
+	}
+	process {
 		foreach ($DN in $SearchBase) {
 			$users += (Get-ADUser -SearchBase $DN -Filter 'employeeid -like "*"' -Properties AccountExpirationDate,`
 								  Department,`
@@ -98,7 +111,12 @@ function Get-AllUserDataAD {
 		}
 		Write-Output $users
 	}
-	END { Write-Verbose "END $($MyInvocation.MyCommand)" }
+	end {
+		$FunctionStopWatch.Stop()
+		Write-Verbose "$($MyInvocation.MyCommand) Took $($FunctionStopWatch.Elapsed.TotalMilliseconds) Milliseconds"
+		Write-Verbose "End $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "End $($MyInvocation.MyCommand)"
+	}
 }
 function Get-FileSCP {
 	[CmdletBinding()]
@@ -128,17 +146,19 @@ function Get-FileSCP {
 	)
 	
 	#https://winscp.net/eng/docs/guide_protecting_credentials_for_automation
-	BEGIN {
-		Write-Verbose "BEGIN $($MyInvocation.MyCommand)"
+	begin {
+		Write-Verbose "Begin $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "Begin $($MyInvocation.MyCommand)"
+		$FunctionStopWatch = [System.Diagnostics.Stopwatch]::StartNew()
 	}
-	PROCESS {
+	process {
 		try {
 			Add-Type -Path $DLLPath
 			$sessionOptions = New-Object WinSCP.SessionOptions -Property @{
-				Protocol    = [WinSCP.Protocol]::Sftp
-				HostName    = $HostName
-				UserName    = $Username
-				Password    = $Password
+				Protocol = [WinSCP.Protocol]::Sftp
+				HostName = $HostName
+				UserName = $Username
+				Password = $Password
 				SshHostKeyFingerprint = $SshHostKeyFingerprint
 			}
 			
@@ -158,7 +178,12 @@ function Get-FileSCP {
 			Write-Error ("Error: {0}" -f $_.Exception.Message)
 		}
 	}
-	END { Write-Verbose "END $($MyInvocation.MyCommand)" }
+	end {
+		$FunctionStopWatch.Stop()
+		Write-Verbose "$($MyInvocation.MyCommand) Took $($FunctionStopWatch.Elapsed.TotalMilliseconds) Milliseconds"
+		Write-Verbose "End $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "End $($MyInvocation.MyCommand)"
+	}
 }
 function Get-OrganizationalUnitPath {
 	[CmdletBinding()]
@@ -181,19 +206,28 @@ function Get-OrganizationalUnitPath {
 		[string]$District
 	)
 	
-	BEGIN { Write-Verbose "BEGIN $($MyInvocation.MyCommand)" }
-	PROCESS {
+	begin {
+		Write-Verbose "Begin $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "Begin $($MyInvocation.MyCommand)"
+		$FunctionStopWatch = [System.Diagnostics.Stopwatch]::StartNew()
+	}
+	process {
 		switch ($District) {
 			NWRESD { $path = $OrganizationalUnit }
 			default { $path = "OU=$GradYear", $OrganizationalUnit -join ',' }
 		}
 		$properties = @{
-			Path	 = $path
+			Path = $path
 		}
 		$obj = New-Object -TypeName PSObject -Property $properties
 		Write-Output $obj
 	}
-	END { Write-Verbose "END $($MyInvocation.MyCommand)" }
+	end {
+		$FunctionStopWatch.Stop()
+		Write-Verbose "$($MyInvocation.MyCommand) Took $($FunctionStopWatch.Elapsed.TotalMilliseconds) Milliseconds"
+		Write-Verbose "End $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "End $($MyInvocation.MyCommand)"
+	}
 }
 function Get-UserDataImport {
 	[CmdletBinding()]
@@ -202,45 +236,54 @@ function Get-UserDataImport {
 		$UserDataRaw
 	)
 	
-	BEGIN { Write-Verbose "BEGIN $($MyInvocation.MyCommand)" }
-	PROCESS {
+	begin {
+		Write-Verbose "Begin $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "Begin $($MyInvocation.MyCommand)"
+		$FunctionStopWatch = [System.Diagnostics.Stopwatch]::StartNew()
+	}
+	process {
 		$properties = @{
-			AccountExpirationDate	  = $UserDataRaw.AccountExpirationDate
+			AccountExpirationDate = $UserDataRaw.AccountExpirationDate
 			ChangePasswordAtNextLogon = $false
-			PasswordNeverExpires	  = $UserDataRaw.PasswordNeverExpires
-			CannotChangePassword	  = $UserDataRaw.CannotChangePassword
-			ScriptPath			      = $UserDataRaw.ScriptPath
-			DataOfBirth			      = $UserDataRaw.BIRTHDATE
-			Department			      = 'Student'
-			Description			      = "Last import: $todaysDate"
-			DisplayName			      = $UserDataRaw.FIRST_NAME, $UserDataRaw.LAST_NAME -join ' '
-			DistinguishedName		  = $null
-			Division				  = $UserDataRaw.HOMEROOM_TCH
-			EmailAddress			  = $null
-			EmployeeID			      = $UserDataRaw.SIS_NUMBER
-			Enabled				      = $true
-			GivenName				  = $UserDataRaw.FIRST_NAME
-			Initials				  = $UserDataRaw.MIDDLE_INIITAL
-			HomeDirectory			  = $null
-			HomeDrive				  = $UserDataRaw.HomeDrive
-			MemberOf				  = $null
-			Name					  = $null
-			Office				      = $UserDataRaw.LOCATION
-			Password				  = $null
-			PasswordCrypt			  = $null
-			Path					  = $UserDataRaw.Path
-			personalTitle			  = $UserDataRaw.CALCULATED_GRAD_YEAR
-			proxyAddresses		      = $null
-			SamAccountName		      = $null
-			Surname				      = $UserDataRaw.LAST_NAME
-			Title					  = $UserDataRaw.GRADE
-			UserPrincipalName		  = $null
-			Notify				      = $false
+			PasswordNeverExpires  = $UserDataRaw.PasswordNeverExpires
+			CannotChangePassword  = $UserDataRaw.CannotChangePassword
+			ScriptPath		      = $UserDataRaw.ScriptPath
+			DataOfBirth		      = $UserDataRaw.BIRTHDATE
+			Department		      = 'Student'
+			Description		      = "Last import: $todaysDate"
+			DisplayName		      = $UserDataRaw.FIRST_NAME, $UserDataRaw.LAST_NAME -join ' '
+			DistinguishedName	  = $null
+			Division			  = $UserDataRaw.HOMEROOM_TCH
+			EmailAddress		  = $null
+			EmployeeID		      = $UserDataRaw.SIS_NUMBER
+			Enabled			      = $true
+			GivenName			  = $UserDataRaw.FIRST_NAME
+			Initials			  = $UserDataRaw.MIDDLE_INIITAL
+			HomeDirectory		  = $null
+			HomeDrive			  = $UserDataRaw.HomeDrive
+			MemberOf			  = $null
+			Name				  = $null
+			Office			      = $UserDataRaw.LOCATION
+			Password			  = $null
+			PasswordCrypt		  = $null
+			Path				  = $UserDataRaw.Path
+			personalTitle		  = $UserDataRaw.CALCULATED_GRAD_YEAR
+			proxyAddresses	      = $null
+			SamAccountName	      = $null
+			Surname			      = $UserDataRaw.LAST_NAME
+			Title				  = $UserDataRaw.GRADE
+			UserPrincipalName	  = $null
+			Notify			      = $false
 		}
 		$userDataImport = New-Object -TypeName PSObject -Property $properties
 		Write-Output $userDataImport
 	}
-	END { Write-Verbose "END $($MyInvocation.MyCommand)" }
+	end {
+		$FunctionStopWatch.Stop()
+		Write-Verbose "$($MyInvocation.MyCommand) Took $($FunctionStopWatch.Elapsed.TotalMilliseconds) Milliseconds"
+		Write-Verbose "End $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "End $($MyInvocation.MyCommand)"
+	}
 }
 function Move-SuspendedAccounts {
 	[CmdletBinding()]
@@ -253,8 +296,12 @@ function Move-SuspendedAccounts {
 				   ValueFromPipelineByPropertyName = $true)]
 		[string]$MoveToOU
 	)
-	BEGIN { Write-Verbose "BEGIN $($MyInvocation.MyCommand)" }
-	PROCESS {
+	begin {
+		Write-Verbose "Begin $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "Begin $($MyInvocation.MyCommand)"
+		$FunctionStopWatch = [System.Diagnostics.Stopwatch]::StartNew()
+	}
+	process {
 		foreach ($DN in $MoveFromOU) {
 			if ($DN -contains 'Disabled') { continue }
 			try {
@@ -264,7 +311,12 @@ function Move-SuspendedAccounts {
 			}
 		}
 	}
-	END { Write-Verbose "END $($MyInvocation.MyCommand)" }
+	end {
+		$FunctionStopWatch.Stop()
+		Write-Verbose "$($MyInvocation.MyCommand) Took $($FunctionStopWatch.Elapsed.TotalMilliseconds) Milliseconds"
+		Write-Verbose "End $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "End $($MyInvocation.MyCommand)"
+	}
 }
 function New-EmailAddress {
 	[CmdletBinding()]
@@ -286,26 +338,35 @@ function New-EmailAddress {
 				   ValueFromPipelineByPropertyName = $true)]
 		[string]$District
 	)
-	BEGIN { Write-Verbose "BEGIN $($MyInvocation.MyCommand)" }
-	PROCESS {
-	switch ($District) {
-		default {
-			$emailAddress = $SamAccountName, $EmailSuffix -join ''
+	begin {
+		Write-Verbose "Begin $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "Begin $($MyInvocation.MyCommand)"
+		$FunctionStopWatch = [System.Diagnostics.Stopwatch]::StartNew()
+	}
+	process {
+		switch ($District) {
+			default {
+				$emailAddress = $SamAccountName, $EmailSuffix -join ''
+			}
 		}
-	}
-	$properties = @{
-		EmailAddress    = $emailAddress
-	}
-	$obj = New-Object -TypeName PSObject -Property $properties
+		$properties = @{
+			EmailAddress = $emailAddress
+		}
+		$obj = New-Object -TypeName PSObject -Property $properties
 		Write-Output $obj
 	}
-	END { Write-Verbose "END $($MyInvocation.MyCommand)" }
+	end {
+		$FunctionStopWatch.Stop()
+		Write-Verbose "$($MyInvocation.MyCommand) Took $($FunctionStopWatch.Elapsed.TotalMilliseconds) Milliseconds"
+		Write-Verbose "End $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "End $($MyInvocation.MyCommand)"
+	}
 }
 function New-GroupAD {
 	[CmdletBinding()]
 	param ()
-
-	New-ADGroup -Name $physicalDeliveryOfficeNameRedux -GroupCategory Security -GroupScope Global -Path "OU=Meraki,OU=Groups,DC=intra,DC=parkrose,DC=k12,DC=or,DC=us" 
+	
+	New-ADGroup -Name $physicalDeliveryOfficeNameRedux -GroupCategory Security -GroupScope Global -Path "OU=Meraki,OU=Groups,DC=intra,DC=parkrose,DC=k12,DC=or,DC=us"
 }
 function New-OrganizationalUnitPath {
 	[CmdletBinding()]
@@ -318,23 +379,32 @@ function New-OrganizationalUnitPath {
 				   ValueFromPipelineByPropertyName = $true)]
 		[string]$District
 	)
-	BEGIN { Write-Verbose "BEGIN $($MyInvocation.MyCommand)" }
-	PROCESS {
-	switch ($District) {
-		default {
-			$ouName, $ouPath = $OrganizationalUnitDN.TrimStart('OU=') -split ',', 2
-			
-			try {
-				New-ADOrganizationalUnit -Name $ouName -Path $ouPath
-			} catch [Exception]
-			{
-				Write-Error ("Error: {0}" -f $_.Exception.Message)
-				continue
+	begin {
+		Write-Verbose "Begin $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "Begin $($MyInvocation.MyCommand)"
+		$FunctionStopWatch = [System.Diagnostics.Stopwatch]::StartNew()
+	}
+	process {
+		switch ($District) {
+			default {
+				$ouName, $ouPath = $OrganizationalUnitDN.TrimStart('OU=') -split ',', 2
+				
+				try {
+					New-ADOrganizationalUnit -Name $ouName -Path $ouPath
+				} catch [Exception]
+				{
+					Write-Error ("Error: {0}" -f $_.Exception.Message)
+					continue
+				}
 			}
 		}
 	}
+	end {
+		$FunctionStopWatch.Stop()
+		Write-Verbose "$($MyInvocation.MyCommand) Took $($FunctionStopWatch.Elapsed.TotalMilliseconds) Milliseconds"
+		Write-Verbose "End $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "End $($MyInvocation.MyCommand)"
 	}
-	END { Write-Verbose "END $($MyInvocation.MyCommand)" }
 }
 function New-Password {
 	[CmdletBinding()]
@@ -381,8 +451,12 @@ function New-Password {
 		[System.String]$DOBPasswordLocations
 	)
 	
-	BEGIN { Write-Verbose "BEGIN $($MyInvocation.MyCommand)" }
-	PROCESS {
+	begin {
+		Write-Verbose "Begin $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "Begin $($MyInvocation.MyCommand)"
+		$FunctionStopWatch = [System.Diagnostics.Stopwatch]::StartNew()
+	}
+	process {
 		switch ($District) {
 			default {
 				if (($UseDefaultPassword) -or ($DefaultPasswordIsStudentID)) {
@@ -412,7 +486,12 @@ function New-Password {
 		$obj = New-Object -TypeName PSObject -Property $properties
 		Write-Output $obj
 	}
-	END { Write-Verbose "END $($MyInvocation.MyCommand)" }
+	end {
+		$FunctionStopWatch.Stop()
+		Write-Verbose "$($MyInvocation.MyCommand) Took $($FunctionStopWatch.Elapsed.TotalMilliseconds) Milliseconds"
+		Write-Verbose "End $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "End $($MyInvocation.MyCommand)"
+	}
 }
 function New-SamAccountName {
 	[CmdletBinding()]
@@ -440,8 +519,12 @@ function New-SamAccountName {
 				   ValueFromPipelineByPropertyName = $true)]
 		[string]$District
 	)
-	BEGIN { Write-Verbose "BEGIN $($MyInvocation.MyCommand)" }
-	PROCESS {
+	begin {
+		Write-Verbose "Begin $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "Begin $($MyInvocation.MyCommand)"
+		$FunctionStopWatch = [System.Diagnostics.Stopwatch]::StartNew()
+	}
+	process {
 		[int]$currentYear = Get-Date -Format 'yyyy'
 		[int]$currentMonth = Get-Date -Format 'MM'
 		switch ($District) {
@@ -501,7 +584,7 @@ function New-SamAccountName {
 				$samAccountName = $GivenName, $SurName.substring(0, 1) -join ''
 				$samAccountName = $samAccountName.ToLower() -replace '\s', '' -replace "'", "" -replace '`', '' -replace ',', '' -replace '\.', '' -replace '-', ''
 				if ($sAMAccountName.Length -ge '18') { $sAMAccountName = $sAMAccountName.substring(0, 18) }
-				$samAccountName = $GradYear.Substring($GradYear.get_Length() - 2), $samAccountName  -join ''
+				$samAccountName = $GradYear.Substring($GradYear.get_Length() - 2), $samAccountName -join ''
 				if (($AllUsersAD.SamAccountName.Contains($samAccountName)) -and (($SurName.Length -gt '1'))) {
 					$i = 1
 					Do {
@@ -511,9 +594,9 @@ function New-SamAccountName {
 							$samAccountName = $GivenName.subString(0, $GivenName.get_Length() - $i), $SurName.substring(0, $i) -join ''
 							$samAccountName = $samAccountName.ToLower() -replace '\s', '' -replace "'", "" -replace '`', '' -replace ',', '' -replace '\.', '' -replace '-', ''
 							if ($sAMAccountName.Length -gt '19') { $sAMAccountName = $sAMAccountName.substring(0, 19) }
-							$samAccountName = $GradYear.Substring($GradYear.get_Length() - 2), $samAccountName  -join ''
+							$samAccountName = $GradYear.Substring($GradYear.get_Length() - 2), $samAccountName -join ''
 						} else {
-							$samAccountName = $GradYear.Substring($GradYear.get_Length() - 2), $GivenName, $SurName.substring(0, $i)  -join ''
+							$samAccountName = $GradYear.Substring($GradYear.get_Length() - 2), $GivenName, $SurName.substring(0, $i) -join ''
 							$samAccountName = $samAccountName.ToLower() -replace '\s', '' -replace "'", "" -replace '`', '' -replace ',', '' -replace '\.', '' -replace '-', ''
 						}
 					} while ($AllUsersAD.SamAccountName.Contains($samAccountName))
@@ -521,7 +604,7 @@ function New-SamAccountName {
 			}
 			
 			default {
-				if (((($Grade -eq '12') -or ($Grade -eq 'TR')) -and ($currentMonth -ge '08') -and ($GradYear -le $currentYear)) -or ($GradYear -lt $currentYear)) { $GradYear = ($currentYear+1) }
+				if (((($Grade -eq '12') -or ($Grade -eq 'TR')) -and ($currentMonth -ge '08') -and ($GradYear -le $currentYear)) -or ($GradYear -lt $currentYear)) { $GradYear = ($currentYear + 1) }
 				if ($GivenName.Length -ge '16') { $GivenName = $GivenName.substring(0, 16) }
 				$samAccountName = $GivenName, $SurName.substring(0, 1) -join ''
 				$samAccountName = $samAccountName.ToLower() -replace '\s', '' -replace "'", "" -replace '`', '' -replace ',', '' -replace '\.', '' -replace '-', ''
@@ -546,14 +629,16 @@ function New-SamAccountName {
 			}
 		}
 		$properties = @{
-		SamAccountName	     = $samAccountName
-		UserPrincipalName    = $samAccountName, $UPNSuffiix -join ''
-		Name				 = $samAccountName
+			SamAccountName    = $samAccountName
+			UserPrincipalName = $samAccountName, $UPNSuffiix -join ''
+			Name			  = $samAccountName
+		}
+		$obj = New-Object -TypeName PSObject -Property $properties
+		Write-Output $obj
 	}
-	$obj = New-Object -TypeName PSObject -Property $properties
-	Write-Output $obj
-	}
-	END {
+	end {
+		$FunctionStopWatch.Stop()
+		Write-Verbose "$($MyInvocation.MyCommand) Took $($FunctionStopWatch.Elapsed.TotalMilliseconds) Milliseconds"
 		Write-Verbose "New-SamAccountName $($samAccountName)"
 		Write-Verbose "END $($MyInvocation.MyCommand)"
 	}
@@ -566,70 +651,68 @@ function New-StudentUserAD {
 				   ValueFromPipelineByPropertyName = $true)]
 		[array]$Student
 	)
-	BEGIN { Write-Verbose "BEGIN $($MyInvocation.MyCommand)" }
-	PROCESS {
-	try {
-		New-ADUser `
-				   -Name $Student.Name `
-				   -AccountPassword $Student.PasswordCrypt `
-				   -Department $Student.Department `
-				   -Description "Last import: $todaysDate" `
-				   -DisplayName $Student.DisplayName `
-				   -Division $Student.Division `
-				   -EmailAddress $Student.EmailAddress `
-				   -EmployeeID $Student.EmployeeID `
-				   -Enabled $Student.Enabled `
-				   -GivenName $Student.GivenName `
-				   -Initials $Student.Initials `
-				   -Office $Student.Office `
-				   -Path $Student.Path `
-				   -SamAccountName $Student.SamAccountName `
-				   -Surname $Student.Surname `
-				   -Title $Student.Title `
-				   -OtherAttributes @{ 'personalTitle' = "$($Student.personalTitle)" } `
-				   -AccountExpirationDate $Student.AccountExpirationDate `
-				   -ScriptPath $Student.ScriptPath `
-				   -CannotChangePassword $Student.CannotChangePassword `
-				   -PasswordNeverExpires $Student.PasswordNeverExpires `
-				   -UserPrincipalName $Student.UserPrincipalName
+	begin {
+		Write-Verbose "Begin $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "Begin $($MyInvocation.MyCommand)"
+		$FunctionStopWatch = [System.Diagnostics.Stopwatch]::StartNew()
+	}
+	process {
+		try {
+			New-ADUser `
+					   -Name $Student.Name `
+					   -AccountPassword $Student.PasswordCrypt `
+					   -Department $Student.Department `
+					   -Description "Last import: $todaysDate" `
+					   -DisplayName $Student.DisplayName `
+					   -Division $Student.Division `
+					   -EmailAddress $Student.EmailAddress `
+					   -EmployeeID $Student.EmployeeID `
+					   -Enabled $Student.Enabled `
+					   -GivenName $Student.GivenName `
+					   -Initials $Student.Initials `
+					   -Office $Student.Office `
+					   -Path $Student.Path `
+					   -SamAccountName $Student.SamAccountName `
+					   -Surname $Student.Surname `
+					   -Title $Student.Title `
+					   -OtherAttributes @{ 'personalTitle' = "$($Student.personalTitle)" } `
+					   -AccountExpirationDate $Student.AccountExpirationDate `
+					   -ScriptPath $Student.ScriptPath `
+					   -CannotChangePassword $Student.CannotChangePassword `
+					   -PasswordNeverExpires $Student.PasswordNeverExpires `
+					   -UserPrincipalName $Student.UserPrincipalName -ErrorAction Stop
 			
 			if ($Student.ChangePasswordAtNextLogon) { Set-ADUser -Identity $Student.SamAccountName -ChangePasswordAtLogon $true }
 		} catch [Microsoft.ActiveDirectory.Management.ADIdentityAlreadyExistsException] {
 			Write-Error ("Error: {0}" -f $_.Exception.Message)
+			Write-LogEntry -Severity 3 -Value "The specified account already exists"
 			Write-Verbose "Attempting to find Account and Associate with EmployeeID"
-			$ExistingStudent = Get-ADUser -Identity $Student.SamAccountName -Properties AccountExpirationDate,`
-										  Department,`
-										  DisplayName,`
-										  DistinguishedName,`
-										  Division,`
-										  MemberOf,`
-										  EmailAddress,`
-										  EmployeeID,`
-										  personalTitle,`
-										  Office,`
-										  Title,`
-										  Surname,`
-										  GivenName,`
-										  Enabled,`
-										  proxyAddresses,`
-										  HomeDirectory,`
-										  Initials`
-			
+			Write-LogEntry -Severity 2 -Value "Attempting to find Account and Associate with EmployeeID"
+			$ExistingStudent = Get-ADUser -Identity $Student.SamAccountName -Properties EmployeeID, Surname, GivenName
 			if ($ExistingStudent.EmployeeID -eq $null) {
-				if (($ExistingStudent.GivenName.substring(0, 1) -eq $Student.GivenName.substring(0, 1)) -and ($ExistingStudent.Surname -like $Student.Surname)) {
-					Set-ADUser -Identity $Student.SamAccountName -EmployeeID $Student.EmployeeID
-					Write-Verbose "Added EmployeeID to User"
-				}
+				Set-ADUser -Identity $Student.SamAccountName -EmployeeID $Student.EmployeeID
+				Write-Verbose "Added EmployeeID to User."
+				Write-LogEntry -Severity 2 -Value "Added EmployeeID to User"
+				$script:userDataImport.Notify = $false
+				continue
 			} else {
+				Write-Verbose "Users EmployeeID Attribute was not null. Didn't overwrite Attribute."
+				Write-LogEntry -Severity 3 -Value "Users EmployeeID Attribute was not null. Didn't overwrite Attribute."
+				$script:userDataImport.Notify = $false
 				continue
 			}
 		} catch {
 			Write-Error ("Error: {0}" -f $_.Exception.Message)
-			$script:userDataImport.Notify = $true
+			$script:userDataImport.Notify = $false
 			continue
 		}
 	}
-	END { Write-Verbose "END $($MyInvocation.MyCommand)" }
+	end {
+		$FunctionStopWatch.Stop()
+		Write-Verbose "$($MyInvocation.MyCommand) Took $($FunctionStopWatch.Elapsed.TotalMilliseconds) Milliseconds"
+		Write-Verbose "End $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "End $($MyInvocation.MyCommand)"
+	}
 }
 function New-StudentUserGoogle {
 	[CmdletBinding()]
@@ -654,21 +737,30 @@ function New-StudentUserGoogle {
 				   ValueFromPipelineByPropertyName = $true)]
 		[string]$Password
 	)
-	BEGIN { Write-Verbose "BEGIN $($MyInvocation.MyCommand)" }
-	PROCESS {
+	begin {
+		Write-Verbose "Begin $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "Begin $($MyInvocation.MyCommand)"
+		$FunctionStopWatch = [System.Diagnostics.Stopwatch]::StartNew()
+	}
+	process {
 		$env:OAUTHFILE = $Oauth2Path
 		try {
 			if ($PSCmdlet.MyInvocation.BoundParameters["Verbose"].IsPresent) {
-				$p = (Start-Process -FilePath $EXEPath -ArgumentList "create user $emailAddress firstname $($firstName -replace ' ','') lastname $($lastName -replace ' ','') password $password" -NoNewWindow -Wait -PassThru)
+				$p = (Start-Process -FilePath $EXEPath -ArgumentList "create user $emailAddress firstname $($firstName -replace ' ', '') lastname $($lastName -replace ' ', '') password $password" -NoNewWindow -Wait -PassThru)
 			} else {
-				$p = (Start-Process -FilePath $EXEPath -ArgumentList "create user $emailAddress firstname $($firstName -replace ' ','') lastname $($lastName -replace ' ','') password $password" -WindowStyle Hidden -Wait -PassThru)
+				$p = (Start-Process -FilePath $EXEPath -ArgumentList "create user $emailAddress firstname $($firstName -replace ' ', '') lastname $($lastName -replace ' ', '') password $password" -WindowStyle Hidden -Wait -PassThru)
 			}
 			if (($p.ExitCode -ne '0') -or ($p.ExitCode -ne '409')) { throw "GAM error exit $($p.exitcode)" }
 		} catch {
 			Write-Error ("Error: {0}" -f $_.Exception.Message)
 		}
 	}
-	END { Write-Verbose "END $($MyInvocation.MyCommand)" }
+	end {
+		$FunctionStopWatch.Stop()
+		Write-Verbose "$($MyInvocation.MyCommand) Took $($FunctionStopWatch.Elapsed.TotalMilliseconds) Milliseconds"
+		Write-Verbose "End $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "End $($MyInvocation.MyCommand)"
+	}
 }
 function New-UserShare {
 	[CmdletBinding()]
@@ -691,8 +783,12 @@ function New-UserShare {
 		[Parameter(Mandatory = $true)]
 		[string]$District
 	)
-	BEGIN { Write-Verbose "BEGIN $($MyInvocation.MyCommand)" }
-	PROCESS {
+	begin {
+		Write-Verbose "Begin $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "Begin $($MyInvocation.MyCommand)"
+		$FunctionStopWatch = [System.Diagnostics.Stopwatch]::StartNew()
+	}
+	process {
 		switch ($District) {
 			default {
 				$sharename = $SAMAccountName, '$' -join ''
@@ -733,12 +829,17 @@ function New-UserShare {
 		# DO NOT continue loop if home directory creation fails. The user already has been created and needs to be reported.
 		
 		$properties = @{
-			HomeDirectory	  = $homeDirectory
+			HomeDirectory = $homeDirectory
 		}
 		$obj = New-Object -TypeName PSObject -Property $properties
 		Write-Output $obj
 	}
-	END { Write-Verbose "END $($MyInvocation.MyCommand)" }
+	end {
+		$FunctionStopWatch.Stop()
+		Write-Verbose "$($MyInvocation.MyCommand) Took $($FunctionStopWatch.Elapsed.TotalMilliseconds) Milliseconds"
+		Write-Verbose "End $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "End $($MyInvocation.MyCommand)"
+	}
 }
 function Publish-FileSCP {
 	[CmdletBinding()]
@@ -767,15 +868,19 @@ function Publish-FileSCP {
 		[string]$SshHostKeyFingerprint
 	)
 	
-	BEGIN { Write-Verbose "BEGIN $($MyInvocation.MyCommand)" }
-	PROCESS {
+	begin {
+		Write-Verbose "Begin $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "Begin $($MyInvocation.MyCommand)"
+		$FunctionStopWatch = [System.Diagnostics.Stopwatch]::StartNew()
+	}
+	process {
 		try {
 			Add-Type -Path $DLLPath
 			$sessionOptions = New-Object WinSCP.SessionOptions -Property @{
-				Protocol    = [WinSCP.Protocol]::Sftp
-				HostName    = $HostName
-				UserName    = $Username
-				Password    = $Password
+				Protocol = [WinSCP.Protocol]::Sftp
+				HostName = $HostName
+				UserName = $Username
+				Password = $Password
 				SshHostKeyFingerprint = $SshHostKeyFingerprint
 			}
 			
@@ -795,7 +900,12 @@ function Publish-FileSCP {
 			Write-Host ("Error: {0}" -f $_.Exception.Message)
 		}
 	}
-	END { Write-Verbose "END $($MyInvocation.MyCommand)" }
+	end {
+		$FunctionStopWatch.Stop()
+		Write-Verbose "$($MyInvocation.MyCommand) Took $($FunctionStopWatch.Elapsed.TotalMilliseconds) Milliseconds"
+		Write-Verbose "End $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "End $($MyInvocation.MyCommand)"
+	}
 }
 function Read-ConfigXML {
 	[CmdletBinding()]
@@ -821,19 +931,23 @@ function Read-ConfigXML {
 		[switch]$Notification,
 		[switch]$GetSynergyImport
 	)
-	BEGIN { Write-Verbose "BEGIN $($MyInvocation.MyCommand)" }
-	PROCESS {
+	begin {
+		Write-Verbose "Begin $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "Begin $($MyInvocation.MyCommand)"
+		$FunctionStopWatch = [System.Diagnostics.Stopwatch]::StartNew()
+	}
+	process {
 		if (!($ConfigXMLObj)) { [System.Xml.XmlDocument]$script:ConfigXMLObj = Get-Content $Path }
 		$Location = $Location.Split("\\\(\)\'./")[0]
 		if ($Script) {
 			$properties = @{
-				UPNSuffix	  = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig" | Select-Object –ExpandProperty Node).UPNSuffix
-				EmailSuffix   = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig" | Select-Object –ExpandProperty Node).EmailSuffix
-				studentsOUs   = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location" | Select-Object –ExpandProperty Node).Path | Get-Unique
-				Locations	  = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location" | Select-Object –ExpandProperty Node)
-				SkipGrades    = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Skip/Grades" | Select-Object –ExpandProperty Node).Grade
+				UPNSuffix = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig" | Select-Object –ExpandProperty Node).UPNSuffix
+				EmailSuffix = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig" | Select-Object –ExpandProperty Node).EmailSuffix
+				studentsOUs = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location" | Select-Object –ExpandProperty Node).Path | Get-Unique
+				Locations = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location" | Select-Object –ExpandProperty Node)
+				SkipGrades = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Skip/Grades" | Select-Object –ExpandProperty Node).Grade
 				SkipLocations = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Skip/Locations" | Select-Object –ExpandProperty Node).Location
-				SkipStudents  = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Skip/Students" | Select-Object –ExpandProperty Node).Student
+				SkipStudents = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Skip/Students" | Select-Object –ExpandProperty Node).Student
 				AccountExpirationDate = (get-date).AddDays(+ ([convert]::ToInt32((Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig" | Select-Object –ExpandProperty Node).AccountExpirationDate)))
 				PasswordNeverExpires = ([System.Convert]::ToBoolean((Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Password" | Select-Object –ExpandProperty Node).PasswordNeverExpires))
 				CannotChangePassword = ([System.Convert]::ToBoolean((Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Password" | Select-Object –ExpandProperty Node).CannotChangePassword))
@@ -845,20 +959,20 @@ function Read-ConfigXML {
 		}
 		if ($NewUserShare) {
 			$properties = @{
-				netBIOSDomainName   = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig" | Select-Object –ExpandProperty Node).NetBIOSDomainName
-				PathOnDrive		    = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location[@Name[contains(.,'$Location')]]/UserShare" | Select-Object –ExpandProperty Node).PathOnDrive
-				DriveLetter		    = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location[@Name[contains(.,'$Location')]]/UserShare" | Select-Object –ExpandProperty Node).DriveLetter
+				netBIOSDomainName = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig" | Select-Object –ExpandProperty Node).NetBIOSDomainName
+				PathOnDrive	      = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location[@Name[contains(.,'$Location')]]/UserShare" | Select-Object –ExpandProperty Node).PathOnDrive
+				DriveLetter	      = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location[@Name[contains(.,'$Location')]]/UserShare" | Select-Object –ExpandProperty Node).DriveLetter
 				HomeDirectoryServer = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location[@Name[contains(.,'$location')]]/UserShare" | Select-Object –ExpandProperty Node).Server
-				HomeDrive		    = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location[@Name[contains(.,'$location')]]" | Select-Object –ExpandProperty Node).HomeDrive
+				HomeDrive		  = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location[@Name[contains(.,'$location')]]" | Select-Object –ExpandProperty Node).HomeDrive
 			}
 			$ConfigObj = New-Object -TypeName PSObject -Property $properties
 			Write-Output $ConfigObj
 		}
 		if ($NewPassword) {
 			$properties = @{
-				Words		  = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Password/Words" | Select-Object –ExpandProperty Node).Word
+				Words = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Password/Words" | Select-Object –ExpandProperty Node).Word
 				SpecialCharacters = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Password/SpecialCharacters" | Select-Object –ExpandProperty Node).Character
-				Numbers	      = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Password/Numbers" | Select-Object –ExpandProperty Node).Number
+				Numbers = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Password/Numbers" | Select-Object –ExpandProperty Node).Number
 				UseDefaultPassword = ([System.Convert]::ToBoolean((Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Password" | Select-Object –ExpandProperty Node).UseDefaultPassword))
 				DefaultPasswordIsStudentID = ([System.Convert]::ToBoolean((Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Password" | Select-Object –ExpandProperty Node).DefaultPasswordIsStudentID))
 				DefaultPassword = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Password" | Select-Object –ExpandProperty Node).DefaultPassword
@@ -870,66 +984,66 @@ function Read-ConfigXML {
 		}
 		if ($GetSynergyImport) {
 			$properties = @{
-				HostName   = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']" | Select-Object –ExpandProperty Node).Hostname
-				UserName   = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']" | Select-Object –ExpandProperty Node).Username
-				Password   = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']" | Select-Object –ExpandProperty Node).Password
+				HostName = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']" | Select-Object –ExpandProperty Node).Hostname
+				UserName = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']" | Select-Object –ExpandProperty Node).Username
+				Password = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']" | Select-Object –ExpandProperty Node).Password
 				SshHostKeyFingerprint = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']" | Select-Object –ExpandProperty Node).HostKeyFingerprint
 				RemoteFilePath = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']/Download" | Select-Object –ExpandProperty Node).PathRemote
 				LocalFilePath = $PSScriptRoot, (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']/Download" | Select-Object –ExpandProperty Node).PathLocal -join '\'
-				DLLPath    = $PSScriptRoot, (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP" | Select-Object –ExpandProperty Node).DLLPath -join '\'
+				DLLPath  = $PSScriptRoot, (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP" | Select-Object –ExpandProperty Node).DLLPath -join '\'
 			}
 			$ConfigObj = New-Object -TypeName PSObject -Property $properties
 			Write-Output $ConfigObj
 		}
 		if ($PublishSynergyExport) {
 			$properties = @{
-				HostName    = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']" | Select-Object –ExpandProperty Node).Hostname
-				UserName    = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']" | Select-Object –ExpandProperty Node).Username
-				Password    = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']" | Select-Object –ExpandProperty Node).Password
+				HostName = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']" | Select-Object –ExpandProperty Node).Hostname
+				UserName = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']" | Select-Object –ExpandProperty Node).Username
+				Password = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']" | Select-Object –ExpandProperty Node).Password
 				SshHostKeyFingerprint = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']" | Select-Object –ExpandProperty Node).HostKeyFingerprint
 				RemoteFilePath = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']/Upload" | Select-Object –ExpandProperty Node).PathRemote
 				LocalFilePath = $PSScriptRoot, (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']/Upload" | Select-Object –ExpandProperty Node).PathLocal -join '\'
-				DLLPath	    = $PSScriptRoot, (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP" | Select-Object –ExpandProperty Node).DLLPath -join '\'
+				DLLPath  = $PSScriptRoot, (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP" | Select-Object –ExpandProperty Node).DLLPath -join '\'
 			}
 			$ConfigObj = New-Object -TypeName PSObject -Property $properties
 			Write-Output $ConfigObj
 		}
 		if ($NewStudentUserGoogle) {
 			$properties = @{
-				EXEPath	    = $PSScriptRoot, (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/GAM" | Select-Object –ExpandProperty Node).EXEPath -join '\'
-				Oauth2Path  = $PSScriptRoot, (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/GAM" | Select-Object –ExpandProperty Node).Oauth2Path -join '\'
+				EXEPath = $PSScriptRoot, (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/GAM" | Select-Object –ExpandProperty Node).EXEPath -join '\'
+				Oauth2Path = $PSScriptRoot, (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/GAM" | Select-Object –ExpandProperty Node).Oauth2Path -join '\'
 			}
 			$ConfigObj = New-Object -TypeName PSObject -Property $properties
 			Write-Output $ConfigObj
 		}
 		if ($ClearFile) {
 			$properties = @{
-				File    = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/CleanupFiles" | Select-Object –ExpandProperty Node).File
+				File = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/CleanupFiles" | Select-Object –ExpandProperty Node).File
 			}
 			$ConfigObj = New-Object -TypeName PSObject -Property $properties
 			Write-Output $ConfigObj
 		}
 		if ($SuspendExpiredAccounts) {
 			$properties = @{
-				OrganizationalUnit	   = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location" | Select-Object –ExpandProperty Node).Path
+				OrganizationalUnit = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location" | Select-Object –ExpandProperty Node).Path
 			}
 			$ConfigObj = New-Object -TypeName PSObject -Property $properties
 			Write-Output $ConfigObj
 		}
 		if ($MoveSuspendedAccounts) {
 			$properties = @{
-				MoveFromOU	   = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location" | Select-Object –ExpandProperty Node).Path
-				MoveToOU	   = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location[@Name=`'Disabled`']" | Select-Object –ExpandProperty Node).Path
+				MoveFromOU = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location" | Select-Object –ExpandProperty Node).Path
+				MoveToOU   = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location[@Name=`'Disabled`']" | Select-Object –ExpandProperty Node).Path
 			}
 			$ConfigObj = New-Object -TypeName PSObject -Property $properties
 			Write-Output $ConfigObj
 		}
 		if ($SendReport) {
 			$properties = @{
-				SMTPServer	     = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/Notifications" | Select-Object –ExpandProperty Node).SMTPServer
-				From			 = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/Notifications" | Select-Object –ExpandProperty Node).From
-				Body			 = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/Notifications" | Select-Object –ExpandProperty Node).Body
-				Subject		     = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/Notifications" | Select-Object –ExpandProperty Node).Subject
+				SMTPServer = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/Notifications" | Select-Object –ExpandProperty Node).SMTPServer
+				From	   = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/Notifications" | Select-Object –ExpandProperty Node).From
+				Body	   = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/Notifications" | Select-Object –ExpandProperty Node).Body
+				Subject    = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/Notifications" | Select-Object –ExpandProperty Node).Subject
 			}
 			$ConfigObj = New-Object -TypeName PSObject -Property $properties
 			Write-Output $ConfigObj
@@ -940,24 +1054,29 @@ function Read-ConfigXML {
 		}
 		if ($WriteSynergyExport) {
 			$properties = @{
-				OrganizationalUnit	    = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location" | Select-Object –ExpandProperty Node).Path
-				Path				    = $PSScriptRoot, (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']/Upload" | Select-Object –ExpandProperty Node).PathLocal -join '\'
-				LDAPAuth			    = ([System.Convert]::ToBoolean((Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/Features" | Select-Object –ExpandProperty Node).ExportSynergyLDAPAuth))
+				OrganizationalUnit = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location" | Select-Object –ExpandProperty Node).Path
+				Path			   = $PSScriptRoot, (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']/Upload" | Select-Object –ExpandProperty Node).PathLocal -join '\'
+				LDAPAuth		   = ([System.Convert]::ToBoolean((Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/Features" | Select-Object –ExpandProperty Node).ExportSynergyLDAPAuth))
 			}
 			$ConfigObj = New-Object -TypeName PSObject -Property $properties
 			Write-Output $ConfigObj
 		}
 		if ($Features) {
 			$properties = @{
-				ExportSynergy    = ([System.Convert]::ToBoolean((Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/Features" | Select-Object –ExpandProperty Node).ExportSynergy))
-				GoogleAccount    = ([System.Convert]::ToBoolean((Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/Features" | Select-Object –ExpandProperty Node).GoogleAccount))
-				UserShare	     = ([System.Convert]::ToBoolean((Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/Features" | Select-Object –ExpandProperty Node).UserShare))
+				ExportSynergy = ([System.Convert]::ToBoolean((Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/Features" | Select-Object –ExpandProperty Node).ExportSynergy))
+				GoogleAccount = ([System.Convert]::ToBoolean((Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/Features" | Select-Object –ExpandProperty Node).GoogleAccount))
+				UserShare	  = ([System.Convert]::ToBoolean((Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/Features" | Select-Object –ExpandProperty Node).UserShare))
 			}
 			$ConfigObj = New-Object -TypeName PSObject -Property $properties
 			Write-Output $ConfigObj
 		}
 	}
-	END { Write-Verbose "END $($MyInvocation.MyCommand)" }
+	end {
+		$FunctionStopWatch.Stop()
+		Write-Verbose "$($MyInvocation.MyCommand) Took $($FunctionStopWatch.Elapsed.TotalMilliseconds) Milliseconds"
+		Write-Verbose "End $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "End $($MyInvocation.MyCommand)"
+	}
 }
 function Send-Report {
 	[CmdletBinding()]
@@ -984,8 +1103,12 @@ function Send-Report {
 				   ValueFromPipelineByPropertyName = $true)]
 		[string]$Body
 	)
-	BEGIN { Write-Verbose "BEGIN $($MyInvocation.MyCommand)" }
-	PROCESS {
+	begin {
+		Write-Verbose "Begin $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "Begin $($MyInvocation.MyCommand)"
+		$FunctionStopWatch = [System.Diagnostics.Stopwatch]::StartNew()
+	}
+	process {
 		if (($StudentData.Office -replace '[^a-zA-Z0-9 ]', '') -like ('*', ($SchoolName -replace '[^a-zA-Z0-9 ]', ''), '*' -join '')) {
 			$file = $PSScriptRoot, '\Files\', ($SchoolName -replace '[^a-zA-Z0-9 ]', ''), '.csv' -join ''
 			$StudentData | Where-Object { ($_.Office -replace '[^a-zA-Z0-9 ]', '') -like ('*', ($SchoolName -replace '[^a-zA-Z0-9 ]', ''), '*' -join '') } | `
@@ -1004,7 +1127,12 @@ function Send-Report {
 			foreach ($EmailAddress in $Recipient) { send-mailmessage -to $EmailAddress -from $From -subject $Subject -body $Body -Attachments $file -SmtpServer $SMTPServer }
 		}
 	}
-	END { Write-Verbose "END $($MyInvocation.MyCommand)" }
+	end {
+		$FunctionStopWatch.Stop()
+		Write-Verbose "$($MyInvocation.MyCommand) Took $($FunctionStopWatch.Elapsed.TotalMilliseconds) Milliseconds"
+		Write-Verbose "End $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "End $($MyInvocation.MyCommand)"
+	}
 }
 function Suspend-ExpiredAccounts {
 	[CmdletBinding()]
@@ -1014,8 +1142,12 @@ function Suspend-ExpiredAccounts {
 				   ValueFromPipelineByPropertyName = $true)]
 		[array]$OrganizationalUnit
 	)
-	BEGIN { Write-Verbose "BEGIN $($MyInvocation.MyCommand)" }
-	PROCESS {
+	begin {
+		Write-Verbose "Begin $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "Begin $($MyInvocation.MyCommand)"
+		$FunctionStopWatch = [System.Diagnostics.Stopwatch]::StartNew()
+	}
+	process {
 		foreach ($DN in $OrganizationalUnit) {
 			try {
 				Search-ADAccount -SearchBase $DN -AccountExpired -UsersOnly | Where-Object { $_.Enabled } | Disable-ADAccount
@@ -1024,7 +1156,12 @@ function Suspend-ExpiredAccounts {
 			}
 		}
 	}
-	END { Write-Verbose "END $($MyInvocation.MyCommand)" }
+	end {
+		$FunctionStopWatch.Stop()
+		Write-Verbose "$($MyInvocation.MyCommand) Took $($FunctionStopWatch.Elapsed.TotalMilliseconds) Milliseconds"
+		Write-Verbose "End $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "End $($MyInvocation.MyCommand)"
+	}
 }
 function Test-OrganizationalUnitPath {
 	[CmdletBinding(ConfirmImpact = 'None')]
@@ -1033,26 +1170,35 @@ function Test-OrganizationalUnitPath {
 		[Parameter(Mandatory = $true)]
 		[string]$OrganizationalUnitDN
 	)
-	BEGIN { Write-Verbose "BEGIN $($MyInvocation.MyCommand)" }
-	PROCESS {
-	if (Get-ADOrganizationalUnit -Filter {
-			distinguishedName -eq $OrganizationalUnitDN
-		}) {
-		$properties = @{
-			Result    = $true
-		}
-	} else {
-		$properties = @{
-			Result    = $false
-		}
+	begin {
+		Write-Verbose "Begin $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "Begin $($MyInvocation.MyCommand)"
+		$FunctionStopWatch = [System.Diagnostics.Stopwatch]::StartNew()
 	}
-	
-	$obj = New-Object -TypeName PSObject -Property $properties
+	process {
+		if (Get-ADOrganizationalUnit -Filter {
+				distinguishedName -eq $OrganizationalUnitDN
+			}) {
+			$properties = @{
+				Result = $true
+			}
+		} else {
+			$properties = @{
+				Result = $false
+			}
+		}
+		
+		$obj = New-Object -TypeName PSObject -Property $properties
 		Write-Output $obj
 	}
-	END { Write-Verbose "END $($MyInvocation.MyCommand)" }
+	end {
+		$FunctionStopWatch.Stop()
+		Write-Verbose "$($MyInvocation.MyCommand) Took $($FunctionStopWatch.Elapsed.TotalMilliseconds) Milliseconds"
+		Write-Verbose "End $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "End $($MyInvocation.MyCommand)"
+	}
 }
-function Update-ExistingUser {
+function Update-StudentUserAD {
 	[CmdletBinding()]
 	param
 	(
@@ -1063,8 +1209,12 @@ function Update-ExistingUser {
 		[Parameter(Mandatory = $true)]
 		[string]$District
 	)
-	BEGIN { Write-Verbose "BEGIN $($MyInvocation.MyCommand)" }
-	PROCESS {
+	begin {
+		Write-Verbose "Begin $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "Begin $($MyInvocation.MyCommand)"
+		$FunctionStopWatch = [System.Diagnostics.Stopwatch]::StartNew()
+	}
+	process {
 		$notify = $false
 		$script:userDataImport.EmailAddress = $DataAD.EmailAddress
 		switch ($District) {
@@ -1108,8 +1258,7 @@ function Update-ExistingUser {
 			}
 			NWRESD {
 				#if ($DataImport.Office -Like 'Levi*') { Set-ADAccountExpiration -Identity $DataAD.SamAccountName -DateTime ($DataImport.AccountExpirationDate).AddDays(- 30) } elseif (($DataImport.Title -eq '12') -or ($DataImport.Title -eq 'TR')) { Set-ADAccountExpiration -Identity $DataAD.SamAccountName -DateTime ($DataImport.AccountExpirationDate).AddDays(+ 365) } else { Set-ADAccountExpiration -Identity $DataAD.SamAccountName -DateTime $DataImport.AccountExpirationDate }
-				if (($DataImport.Title -eq '12') -or ($DataImport.Title -eq 'TR')) { Set-ADAccountExpiration -Identity $DataAD.SamAccountName -DateTime ($DataImport.AccountExpirationDate).AddDays(+ 365) }
-				else { Set-ADAccountExpiration -Identity $DataAD.SamAccountName -DateTime $DataImport.AccountExpirationDate }
+				if (($DataImport.Title -eq '12') -or ($DataImport.Title -eq 'TR')) { Set-ADAccountExpiration -Identity $DataAD.SamAccountName -DateTime ($DataImport.AccountExpirationDate).AddDays(+ 365) } else { Set-ADAccountExpiration -Identity $DataAD.SamAccountName -DateTime $DataImport.AccountExpirationDate }
 				Set-ADUser -Identity $DataAD.SamAccountName -Title $DataImport.Title -Description $DataImport.Description -Department $DataImport.Department -Office $DataImport.Office
 				if (($DataImport.Initials) -and ($DataAD.Initials -ne $DataImport.Initials)) { Set-ADUser -Identity $DataAD.SamAccountName -Initials $DataImport.Initials }
 				if ($DataAD.ScriptPath -ne $DataImport.ScriptPath) { Set-ADUser -Identity $DataAD.SamAccountName -ScriptPath $DataImport.ScriptPath }
@@ -1145,10 +1294,38 @@ function Update-ExistingUser {
 					try { Move-Item -Path ('\\', $ConfigNUS.HomeDirectoryServer, '\', $ConfigNUS.DriveLetter, '$\', $ConfigNUS.PathOnDrive, '\', $DataAD.SamAccountName -join '') -Destination ('\\', $ConfigNUS.HomeDirectoryServer, '\', $ConfigNUS.DriveLetter, '$\', $ConfigNUS.PathOnDrive, '\', $DataImport.SamAccountName -join '') } catch { Write-Error ("Error: {0}" -f $_.Exception.Message) }
 				}
 			}
-			EXAMPLE {
-				#	if ($DataAD.DisplayName -ne $DataImport.DisplayName) { Set-ADUser -Identity $DataAD.SamAccountName -DisplayName $DataImport.DisplayName ; $notify = $true }
-				#	if ($DataAD.GivenName -ne $DataImport.GivenName) { Set-ADUser -Identity $DataAD.SamAccountName -GivenName $DataImport.GivenName ; $notify = $true }
-				#	if ($DataAD.Name -ne $DataImport.Name) { Set-ADUser -Identity $DataAD.Name -GivenName $DataImport.Name }
+			SEASIDE {
+				Set-ADAccountExpiration -Identity $DataAD.SamAccountName -DateTime $DataImport.AccountExpirationDate
+				Set-ADUser -Identity $DataAD.SamAccountName -Title $DataImport.Title -Description $DataImport.Description -Department $DataImport.Department -Office $DataImport.Office
+				if ($DataAD.Surname -ne $DataImport.Surname) { Set-ADUser -Identity $DataAD.SamAccountName -Surname $DataImport.Surname -DisplayName $DataImport.DisplayName }
+				if ($DataAD.personalTitle -ne $DataImport.personalTitle) {
+					Set-ADUser -Identity $DataAD.SamAccountName -Clear personalTitle
+					Set-ADUser -Identity $DataAD.SamAccountName -Add @{ 'personalTitle' = "$($DataImport.personalTitle)" }
+				}
+				if ($userDataAD.Enabled -eq $false) {
+					Write-LogEntry -Severity 1 -Value "Enabling Account"
+					$notify = $true
+					try {
+						Set-ADUser -Identity $DataAD.SamAccountName -Enabled $true
+					} catch {
+						Write-Error ("Error: {0}" -f $_.Exception.Message)
+						$notify = $false
+						continue
+					}
+				}
+				if (($userDataAD.DistinguishedName -like ('*Disabled*'))) {
+					Write-LogEntry -Severity 2 -Value "Moving Account"
+					$notify = $true
+					if (!(Test-OrganizationalUnitPath -OrganizationalUnitDN $DataImport.Path).Result) { New-OrganizationalUnitPath -OrganizationalUnitDN $DataImport.Path -District $District }
+					try { Move-ADObject -Identity $userDataAD.DistinguishedName -targetpath $DataImport.Path } catch { Write-Error ("Error: {0}" -f $_.Exception.Message) }
+				}
+				if (($DataImport.SamAccountName.Substring(0, 2) -ne $DataAD.SamAccountName.Substring(0, 2)) -and (($DataImport.Title -eq '12') -or ($DataImport.Title -eq 'TR'))) {
+					Write-LogEntry -Severity 2 -Value "Moving Account"
+					$notify = $true
+					$script:userDataImport.EmailAddress = (New-EmailAddress -GivenName $DataImport.GivenName -Surname $DataImport.Surname -SamAccountName $DataImport.SamAccountName -EmailSuffix $ConfigScript.EmailSuffix -District $District).EmailAddress
+					try { Set-ADUser -Identity $DataAD.SamAccountName -Add @{ 'proxyAddresses' = "$($DataAD.EmailAddress)" } } catch { Write-Error ("Error: {0}" -f $_.Exception.Message) }
+					try { Set-ADUser -Identity $DataAD.SamAccountName -EmailAddress $DataImport.EmailAddress -UserPrincipalName $DataImport.UserPrincipalName -SamAccountName $DataImport.SamAccountName -PassThru | Rename-ADObject -NewName $DataImport.SamAccountName } catch { Write-Error ("Error: {0}" -f $_.Exception.Message) }
+				}
 			}
 			default {
 				if (($DataImport.Title -eq '12') -or ($DataImport.Title -eq 'TR')) {
@@ -1186,12 +1363,17 @@ function Update-ExistingUser {
 			}
 		}
 		$properties = @{
-			Notify    = $notify
+			Notify = $notify
 		}
 		$obj = New-Object -TypeName PSObject -Property $properties
 		Write-Output $obj
 	}
-	END { Write-Verbose "END $($MyInvocation.MyCommand)" }
+	end {
+		$FunctionStopWatch.Stop()
+		Write-Verbose "$($MyInvocation.MyCommand) Took $($FunctionStopWatch.Elapsed.TotalMilliseconds) Milliseconds"
+		Write-Verbose "End $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "End $($MyInvocation.MyCommand)"
+	}
 }
 function Write-LogEntry {
 	param
@@ -1224,7 +1406,7 @@ function Write-LogEntry {
 	$Context = $([System.Security.Principal.WindowsIdentity]::GetCurrent().Name)
 	
 	# Construct final log entry
-	$LogText = "<![LOG[$($Value)]LOG]!><time=""$($Time)"" date=""$($Date)"" component=""StudentImport"" context=""$($Context)"" type=""$($Severity)"" thread=""$($PID)"" file="""">"
+	$LogText = "<![LOG[$($Value)]LOG]!><time=""$($Time)"" date=""$($Date)"" component=""StudentImport.ps1"" context=""$($Context)"" type=""$($Severity)"" thread=""$($PID)"" file="""">"
 	
 	# Add value to log file
 	try {
@@ -1251,8 +1433,12 @@ function Write-SynergyExportFile {
 		[string]$District
 	)
 	
-	BEGIN { Write-Verbose "BEGIN $($MyInvocation.MyCommand)" }
-	PROCESS {
+	begin {
+		Write-Verbose "Begin $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "Begin $($MyInvocation.MyCommand)"
+		$FunctionStopWatch = [System.Diagnostics.Stopwatch]::StartNew()
+	}
+	process {
 		
 		switch ($District) {
 			RIVERDALE {
@@ -1262,14 +1448,14 @@ function Write-SynergyExportFile {
 					}
 					$users | Where-Object { ($_.EmployeeID -match "^[\d\.]+$") -and ($_.Mail -ne $null) -and ($_.Title -match '[5-9]|10|11|12|TR') } | Select-Object employeeid, mail, SamAccountName | export-csv -delimiter "`t" -notypeinformation -append -path $Path
 					(Get-Content $Path) | ForEach-Object { $_ -replace '"', '' } | out-file -FilePath $Path -Force -Encoding ascii
-					(Get-Content $Path) | Select-Object -Skip 1 | Set-Content $Path
+					(Get-Content $Path) | Select-Object -SkipLast 1 | Set-Content $Path
 				} else {
 					foreach ($DN in $OrganizationalUnit) {
 						$users += Get-ADUser -SearchBase $DN -Filter { (Enabled -eq $true) } -Properties mail, employeeID, assistant
 					}
 					$users | Where-Object { ($_.EmployeeID -match "^[\d\.]+$") -and ($_.Mail -ne $null) -and ($_.Title -match '[5-9]|10|11|12|TR') } | Select-Object employeeid, mail, assistant | export-csv -delimiter "`t" -notypeinformation -append -path $Path
 					(Get-Content $Path) | ForEach-Object { $_ -replace '"', '' } | out-file -FilePath $Path -Force -Encoding ascii
-					(Get-Content $Path) | Select-Object -Skip 1 | Set-Content $Path
+					(Get-Content $Path) | Select-Object -SkipLast 1 | Set-Content $Path
 				}
 			}
 			default {
@@ -1279,104 +1465,124 @@ function Write-SynergyExportFile {
 					}
 					$users | Where-Object { ($_.EmployeeID -match "^[\d\.]+$") -and ($_.Mail -ne $null) } | Select-Object employeeid, mail, SamAccountName | export-csv -delimiter "`t" -notypeinformation -append -path $Path
 					(Get-Content $Path) | ForEach-Object { $_ -replace '"', '' } | out-file -FilePath $Path -Force -Encoding ascii
-					(Get-Content $Path) | Select-Object -Skip 1 | Set-Content $Path
+					(Get-Content $Path) | Select-Object -SkipLast 1 | Set-Content $Path
 				} else {
 					foreach ($DN in $OrganizationalUnit) {
 						$users += Get-ADUser -SearchBase $DN -Filter { (Enabled -eq $true) } -Properties mail, employeeID, assistant
 					}
 					$users | Where-Object { ($_.EmployeeID -match "^[\d\.]+$") -and ($_.Mail -ne $null) } | Select-Object employeeid, mail, assistant | export-csv -delimiter "`t" -notypeinformation -append -path $Path
 					(Get-Content $Path) | ForEach-Object { $_ -replace '"', '' } | out-file -FilePath $Path -Force -Encoding ascii
-					(Get-Content $Path) | Select-Object -Skip 1 | Set-Content $Path
+					(Get-Content $Path) | Select-Object -SkipLast 1 | Set-Content $Path
 				}
 			}
 		}
 	}
-	END { Write-Verbose "END $($MyInvocation.MyCommand)" }
+	end {
+		Write-Verbose "$($MyInvocation.MyCommand) Took $($FunctionStopWatch.Elapsed.TotalMilliseconds) Milliseconds"
+		Write-Verbose "End $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "End $($MyInvocation.MyCommand)"
+	}
 }
 #endregion Functions
 #region Begin
-Read-ConfigXML -District $District -Path $ConfigXML -ClearFile | Clear-File
-Read-ConfigXML -District $District -Path $ConfigXML -GetSynergyImport | Get-FileSCP
-$ConfigScript = Read-ConfigXML -District $District -Path $ConfigXML -Script
-$ConfigF = Read-ConfigXML -District $District -Path $ConfigXML -Features
-$userdata = Import-Csv -Path $ConfigScript.ImportCSVPath
-#endregion Begin
-#region Process
-foreach ($row in $userdata) {
-	Write-Verbose "BEGIN $($row.SIS_NUMBER)"
-	$currentUsers = [Collections.Generic.List[Object]](Get-AllUserDataAD -SearchBase ($ConfigScript.studentsOUs))
-	if (($ConfigScript.SkipGrades -eq $row.Grade) -or (($ConfigScript.SkipLocations -replace '[^a-zA-Z0-9 ]', '') -eq ($row.LOCATION -replace '[^a-zA-Z0-9 ]', '')) -or ($ConfigScript.SkipStudents -eq $row.SIS_NUMBER)) {
-		Write-Verbose "SKIP $($row.SIS_NUMBER)"
-		continue
+try {
+	$ScriptStopWatch = [system.diagnostics.stopwatch]::StartNew()
+	Write-Verbose "Script Start"
+	Read-ConfigXML -District $District -Path $ConfigXML -ClearFile | Clear-File
+	Read-ConfigXML -District $District -Path $ConfigXML -GetSynergyImport | Get-FileSCP
+	$ConfigScript = Read-ConfigXML -District $District -Path $ConfigXML -Script
+	$ConfigF = Read-ConfigXML -District $District -Path $ConfigXML -Features
+	$userdata = Import-Csv -Path $ConfigScript.ImportCSVPath | Sort-Object -Property SIS_NUMBER
+	#endregion Begin
+	#region Process
+	foreach ($row in $userdata) {
+		$rowStopWatch = [system.diagnostics.stopwatch]::StartNew()
+		Write-Verbose "Begin $($row.SIS_NUMBER)"
+		Write-LogEntry -Severity 1 -Value "Begin $($row.SIS_NUMBER)"
+		$currentUsers = [Collections.Generic.List[Object]](Get-AllUserDataAD -SearchBase ($ConfigScript.studentsOUs))
+		if (($ConfigScript.SkipGrades -eq $row.Grade) -or (($ConfigScript.SkipLocations -replace '[^a-zA-Z0-9 ]', '') -eq ($row.LOCATION -replace '[^a-zA-Z0-9 ]', '')) -or ($ConfigScript.SkipStudents -eq $row.SIS_NUMBER)) {
+			Write-Verbose "SKIP $($row.SIS_NUMBER)"
+			Write-LogEntry -Severity 2 -Value "SKIP $($row.SIS_NUMBER)"
+			continue
+		}
+		$index = $currentUsers.FindIndex({ $args[0].EmployeeID -eq $row.SIS_NUMBER })
+		$script:userDataAD = $currentUsers[$index]
+		
+		$ConfigNUS = Read-ConfigXML -District $District -Location $row.LOCATION -Path $ConfigXML -NewUserShare
+		
+		Add-Member -InputObject $row -NotePropertyName Path -NotePropertyValue (($ConfigScript.Locations | Where-Object { ($_.Name -replace '[^a-zA-Z0-9 ]', '') -match ($row.LOCATION -replace '[^a-zA-Z0-9 ]', '') }).Path)
+		Add-Member -InputObject $row -NotePropertyName ScriptPath -NotePropertyValue (($ConfigScript.Locations | Where-Object { ($_.Name -replace '[^a-zA-Z0-9 ]', '') -match ($row.LOCATION -replace '[^a-zA-Z0-9 ]', '') }).ScriptPath)
+		Add-Member -InputObject $row -NotePropertyName PasswordNeverExpires -NotePropertyValue $ConfigScript.PasswordNeverExpires
+		Add-Member -InputObject $row -NotePropertyName AccountExpirationDate -NotePropertyValue $ConfigScript.AccountExpirationDate
+		Add-Member -InputObject $row -NotePropertyName CannotChangePassword -NotePropertyValue $ConfigScript.CannotChangePassword
+		Add-Member -InputObject $row -NotePropertyName ChangePasswordAtNextLogon -NotePropertyValue $ConfigScript.ChangePasswordAtNextLogon
+		Add-Member -InputObject $row -NotePropertyName HomeDrive -NotePropertyValue $ConfigNUS.HomeDrive
+		
+		$userDataImport = Get-UserDataImport -UserDataRaw $row
+		
+		if ($index -eq -1) {
+			Write-Verbose "New User $($row.SIS_NUMBER)"
+			Write-LogEntry -Severity 1 -Value "New User $($row.SIS_NUMBER)"
+			$userDataAD = $null
+			$userDataImport.Notify = $true
+			$userDataImport.Path = (Get-OrganizationalUnitPath -Location $userDataImport.Office -GradYear $userDataImport.personalTitle.Substring(2) -Grade $userDataImport.Title -OrganizationalUnit $userDataImport.Path -District $District).Path
+			if (!(Test-OrganizationalUnitPath -OrganizationalUnitDN $userDataImport.Path).Result) { New-OrganizationalUnitPath -OrganizationalUnitDN $userDataImport.Path -District $District }
+			New-SamAccountName -GivenName $userDataImport.GivenName -SurName $userDataImport.Surname -GradYear $userDataImport.personalTitle.Substring(2) -UPNSuffiix $ConfigScript.UPNSuffix -Grade $userDataImport.Title -AllUsersAD $currentUsers -District $District | Foreach-Object { $userDataImport.Name = $_.Name; $userDataImport.UserPrincipalName = $_.UserPrincipalName; $userDataImport.SamAccountName = $_.SamAccountName }
+			Read-ConfigXML -District $District -Path $ConfigXML -NewPassword | New-Password -EmployeeID $userDataImport.EmployeeID -DateOfBirth $userDataImport.DataOfBirth -Grade $userDataImport.Title -Office $userDataImport.Office -District $District | Foreach-Object { $userDataImport.Password = $_.Password; $userDataImport.PasswordCrypt = $_.PasswordCrypt; }
+			$userDataImport.EmailAddress = (New-EmailAddress -GivenName $userDataImport.GivenName -Surname $userDataImport.Surname -SamAccountName $userDataImport.SamAccountName -EmailSuffix $ConfigScript.EmailSuffix -District $District).EmailAddress
+			New-StudentUserAD -Student $userDataImport
+			if ($ConfigF.GoogleAccount) { Read-ConfigXML -District $District -Path $ConfigXML -NewStudentUserGoogle | New-StudentUserGoogle -EmailAddress $userDataImport.EmailAddress -FirstName $userDataImport.GivenName -LastName $userDataImport.Surname -Password $userDataImport.Password }
+			if (($ConfigF.UserShare) -and ($ConfigNUS.HomeDirectoryServer)) { $ConfigNUS | New-UserShare -SAMAccountName $userDataImport.SamAccountName -District $District | ForEach-Object { $userDataImport.HomeDirectory = $_.HomeDirectory; Set-ADUser -Identity $userDataImport.SamAccountName -HomeDirectory $_.HomeDirectory; Set-ADUser -Identity $userDataImport.SamAccountName -HomeDrive $userDataImport.HomeDrive } }
+		} else {
+			Write-Verbose "Update Existing User $($row.SIS_NUMBER)"
+			Write-LogEntry -Severity 1 -Value "Update Existing User $($row.SIS_NUMBER)"
+			$userDataImport.HomeDirectory = '\\', $ConfigNUS.HomeDirectoryServer, '\', $userDataAD.SamAccountName, '$' -join ''
+			$userDataImport.Path = (Get-OrganizationalUnitPath -Location $userDataImport.Office -GradYear $userDataImport.personalTitle.Substring(2) -Grade $userDataImport.Title -OrganizationalUnit $userDataImport.Path -District $District).Path
+			New-SamAccountName -GivenName $userDataAD.GivenName -SurName $userDataAD.Surname -GradYear $userDataImport.personalTitle.Substring(2) -UPNSuffiix $ConfigScript.UPNSuffix -Grade $userDataImport.Title -AllUsersAD $currentUsers -District $District | Foreach-Object { $userDataImport.Name = $_.Name; $userDataImport.UserPrincipalName = $_.UserPrincipalName; $userDataImport.SamAccountName = $_.SamAccountName }
+			$userDataImport.Notify = (Update-StudentUserAD -DataAD $userDataAD -DataImport $userDataImport -District $District).Notify
+		}
+		if ($userDataImport.Notify -eq $true) {
+			$output += $userDataImport
+			Write-Verbose "Notify $($row.SIS_NUMBER)"
+			Write-LogEntry -Severity 1 -Value "Notify $($row.SIS_NUMBER)"
+		}
+		$rowStopWatch.Stop()
+		Write-Verbose "$($row.SIS_NUMBER) took $($rowStopWatch.ElapsedMilliseconds) Milliseconds."
+		Write-Verbose "End $($row.SIS_NUMBER)"
+		Write-LogEntry -Severity 1 -Value "End $($row.SIS_NUMBER)"
 	}
-	$index = $currentUsers.FindIndex({ $args[0].EmployeeID -eq $row.SIS_NUMBER })
-	$script:userDataAD = $currentUsers[$index]
-	
-	$ConfigNUS = Read-ConfigXML -District $District -Location $row.LOCATION -Path $ConfigXML -NewUserShare
-	
-	Add-Member -InputObject $row -NotePropertyName Path -NotePropertyValue (($ConfigScript.Locations | Where-Object { ($_.Name -replace '[^a-zA-Z0-9 ]', '') -match ($row.LOCATION -replace '[^a-zA-Z0-9 ]', '') }).Path)
-	Add-Member -InputObject $row -NotePropertyName ScriptPath -NotePropertyValue (($ConfigScript.Locations | Where-Object { ($_.Name -replace '[^a-zA-Z0-9 ]', '') -match ($row.LOCATION -replace '[^a-zA-Z0-9 ]', '') }).ScriptPath)
-	Add-Member -InputObject $row -NotePropertyName PasswordNeverExpires -NotePropertyValue $ConfigScript.PasswordNeverExpires
-	Add-Member -InputObject $row -NotePropertyName AccountExpirationDate -NotePropertyValue $ConfigScript.AccountExpirationDate
-	Add-Member -InputObject $row -NotePropertyName CannotChangePassword -NotePropertyValue $ConfigScript.CannotChangePassword
-	Add-Member -InputObject $row -NotePropertyName ChangePasswordAtNextLogon -NotePropertyValue $ConfigScript.ChangePasswordAtNextLogon
-	Add-Member -InputObject $row -NotePropertyName HomeDrive -NotePropertyValue $ConfigNUS.HomeDrive
-	
-	$userDataImport = Get-UserDataImport -UserDataRaw $row
-	
-	if ($index -eq -1) {
-		Write-Verbose "NEW $($row.SIS_NUMBER)"
-		$userDataAD = $null
-		$userDataImport.Notify = $true
-		$userDataImport.Path = (Get-OrganizationalUnitPath -Location $userDataImport.Office -GradYear $userDataImport.personalTitle.Substring(2) -Grade $userDataImport.Title -OrganizationalUnit $userDataImport.Path -District $District).Path
-		if (!(Test-OrganizationalUnitPath -OrganizationalUnitDN $userDataImport.Path).Result) { New-OrganizationalUnitPath -OrganizationalUnitDN $userDataImport.Path -District $District }
-		New-SamAccountName -GivenName $userDataImport.GivenName -SurName $userDataImport.Surname -GradYear $userDataImport.personalTitle.Substring(2) -UPNSuffiix $ConfigScript.UPNSuffix -Grade $userDataImport.Title -AllUsersAD $currentUsers -District $District | Foreach-Object { $userDataImport.Name = $_.Name; $userDataImport.UserPrincipalName = $_.UserPrincipalName; $userDataImport.SamAccountName = $_.SamAccountName }
-		Read-ConfigXML -District $District -Path $ConfigXML -NewPassword | New-Password -EmployeeID $userDataImport.EmployeeID -DateOfBirth $userDataImport.DataOfBirth -Grade $userDataImport.Title -Office $userDataImport.Office -District $District | Foreach-Object { $userDataImport.Password = $_.Password; $userDataImport.PasswordCrypt = $_.PasswordCrypt; }
-		$userDataImport.EmailAddress = (New-EmailAddress -GivenName $userDataImport.GivenName -Surname $userDataImport.Surname -SamAccountName $userDataImport.SamAccountName -EmailSuffix $ConfigScript.EmailSuffix -District $District).EmailAddress
-		New-StudentUserAD -Student $userDataImport
-		if ($ConfigF.GoogleAccount) { Read-ConfigXML -District $District -Path $ConfigXML -NewStudentUserGoogle | New-StudentUserGoogle -EmailAddress $userDataImport.EmailAddress -FirstName $userDataImport.GivenName -LastName $userDataImport.Surname -Password $userDataImport.Password }
-		if (($ConfigF.UserShare) -and ($ConfigNUS.HomeDirectoryServer)) { $ConfigNUS | New-UserShare -SAMAccountName $userDataImport.SamAccountName -District $District | ForEach-Object { $userDataImport.HomeDirectory = $_.HomeDirectory; Set-ADUser -Identity $userDataImport.SamAccountName -HomeDirectory $_.HomeDirectory; Set-ADUser -Identity $userDataImport.SamAccountName -HomeDrive $userDataImport.HomeDrive } }
-	} else {
-		Write-Verbose "UPDATE $($row.SIS_NUMBER)"
-		$userDataImport.HomeDirectory = '\\', $ConfigNUS.HomeDirectoryServer, '\', $userDataAD.SamAccountName, '$' -join ''
-		$userDataImport.Path = (Get-OrganizationalUnitPath -Location $userDataImport.Office -GradYear $userDataImport.personalTitle.Substring(2) -Grade $userDataImport.Title -OrganizationalUnit $userDataImport.Path -District $District).Path
-		New-SamAccountName -GivenName $userDataAD.GivenName -SurName $userDataAD.Surname -GradYear $userDataImport.personalTitle.Substring(2) -UPNSuffiix $ConfigScript.UPNSuffix -Grade $userDataImport.Title -AllUsersAD $currentUsers -District $District | Foreach-Object { $userDataImport.Name = $_.Name; $userDataImport.UserPrincipalName = $_.UserPrincipalName; $userDataImport.SamAccountName = $_.SamAccountName }
-		$userDataImport.Notify = (Update-ExistingUser -DataAD $userDataAD -DataImport $userDataImport -District $District).Notify
+	#endregion Process
+	#region End
+	if ($output) {
+		$Notification = (Read-ConfigXML -District $District -Path $ConfigXML -Notification)
+		foreach ($location in $Notification.Name) {
+			$Notification | Where-Object { $_.Name -eq $location } | ForEach-Object { $Name = $_.Name; $Recipient = $_.Recipient }
+			Read-ConfigXML -District $District -Path $ConfigXML -SendReport | Send-Report -StudentData $Output -SchoolName $Name -Recipient $Recipient
+		}
 	}
-	if ($userDataImport.Notify -eq $true) {
-		$output += $userDataImport
-		Write-Verbose "NOTIFY $($row.SIS_NUMBER)"
+	
+	Read-ConfigXML -District $District -Path $ConfigXML -SuspendExpiredAccounts | Suspend-ExpiredAccounts
+	Read-ConfigXML -District $District -Path $ConfigXML -MoveSuspendedAccounts | Move-SuspendedAccounts
+	
+	if ($ConfigF.ExportSynergy) {
+		Read-ConfigXML -District $District -Path $ConfigXML -WriteSynergyExport | Write-SynergyExportFile -District $District
+		Read-ConfigXML -District $District -Path $ConfigXML -PublishSynergyExport | Publish-FileSCP
+		
 	}
-	Write-Verbose "END $($row.SIS_NUMBER)"
+} finally {
+	Pop-Location
+	Remove-PSDrive -Name Script
+	$ScriptStopWatch.Stop()
+	Write-Verbose "StudentImport took $($global:ScriptStopWatch.Elapsed.TotalMinutes) Minutes."
 }
-#endregion Process
-#region End
-if ($output) {
-	$Notification = (Read-ConfigXML -District $District -Path $ConfigXML -Notification)
-	foreach ($location in $Notification.Name) {
-		$Notification | Where-Object { $_.Name -eq $location } | ForEach-Object { $Name = $_.Name; $Recipient = $_.Recipient }
-		Read-ConfigXML -District $District -Path $ConfigXML -SendReport | Send-Report -StudentData $Output -SchoolName $Name -Recipient $Recipient
-	}
-}
-
-Read-ConfigXML -District $District -Path $ConfigXML -SuspendExpiredAccounts | Suspend-ExpiredAccounts
-Read-ConfigXML -District $District -Path $ConfigXML -MoveSuspendedAccounts | Move-SuspendedAccounts
-
-if ($ConfigF.ExportSynergy) {
-	Read-ConfigXML -District $District -Path $ConfigXML -WriteSynergyExport | Write-SynergyExportFile -District $District
-	Read-ConfigXML -District $District -Path $ConfigXML -PublishSynergyExport | Publish-FileSCP
-}
-
-Pop-Location
-Remove-PSDrive -Name Script
 #endregion End
 
 
 # SIG # Begin signature block
 # MIId7QYJKoZIhvcNAQcCoIId3jCCHdoCAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCCxRtTPf8+Fqpd2
-# 8IakEF9Da0o6vj1LNpxqhZ0OPma50KCCGK8wggPQMIICuKADAgECAhBWDzlgMpdv
+# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCBWGxiuKRqTDEPL
+# fKz67A3Bw47egc/35RgpSA7+Myfkr6CCGK8wggPQMIICuKADAgECAhBWDzlgMpdv
 # skWlu9PmVks2MA0GCSqGSIb3DQEBCwUAMFoxEzARBgoJkiaJk/IsZAEZFgNvcmcx
 # GzAZBgoJkiaJk/IsZAEZFgtjYXNjYWRldGVjaDEVMBMGCgmSJomT8ixkARkWBWlu
 # dHJhMQ8wDQYDVQQDEwZDVEEtQ0EwHhcNMTUwODE4MjIwMDI3WhcNMzUwODE4MjIy
@@ -1512,25 +1718,25 @@ Remove-PSDrive -Name Script
 # GQYKCZImiZPyLGQBGRYLY2FzY2FkZXRlY2gxFTATBgoJkiaJk/IsZAEZFgVpbnRy
 # YTETMBEGA1UEAxMKQ1RBLUlOVC1DQQITTQAACNTm6lyP5isnXwAAAAAI1DANBglg
 # hkgBZQMEAgEFAKBMMBkGCSqGSIb3DQEJAzEMBgorBgEEAYI3AgEEMC8GCSqGSIb3
-# DQEJBDEiBCCeYMBCC4D2UNT145QiV2yd1S9UAyOcScjErATA5wF6+DANBgkqhkiG
-# 9w0BAQEFAASCAQBwy92KCYgxfrUJrGuD5SyMshAZ6IO2+v7wKrNpW0xFaavKN9ld
-# tmkea6xjrS/OLQCsdalkTG/EjdDz0St6cKpoQE5Lvf7QKgH1OfZII+K5XZePvkR4
-# 0GOY9vm3v8D8wKBlEPN0jerU49dJ4dLpNY9SiBzJqA9EEi1qNMptr02ysBqlRhOm
-# e2QrT4b46uFGU53BkSj9iyw+7xXi0q/W/gOJrMmcGx74k6+73xZAPY4fW7YsVkL3
-# cs0plzf3E1D/UDhCpRFccB98KCH86emx558CFny2+0xEOQNzNX8fQjaBEWKXrLCS
-# u2spl9vGGLe6tIwoo/zZ+7A72Q6R/x6ew6G0oYICojCCAp4GCSqGSIb3DQEJBjGC
+# DQEJBDEiBCA2mZ/LJ475PEVsxznGFSAE0PIo1IpVHKZwHjLXwxYF+zANBgkqhkiG
+# 9w0BAQEFAASCAQAQemMN8llfn02KzU77tw6ArRGSNggdQuXIhSAD7GHH9u3cgADp
+# yg6LxetZ/looC0GJfNULKM1yJYRSPlA/eEYZkKyuROjpPRtffLaZ3PNUYyfmnkdv
+# OqpREsef2LtxiuVGlxGLeGqEHsatI9caZIHbDV02Jfc1/kqsR97ue6ALZbGWIy0c
+# Nh66kwGMXUEBMrOImkC8STZUZ2nJ6GwYOd2lpaOy0cWkk/b/YHUFd41NrqQ/bP0o
+# WA7cVklJCdareq1YPge8+xpDKGkZZwHoG8PTzAD18PIZB5uXdd05+y0RaGo9iDO3
+# s5SDXB52/5DSRLo323nolFMvaYC6wcipPVO0oYICojCCAp4GCSqGSIb3DQEJBjGC
 # Ao8wggKLAgEBMGgwUjELMAkGA1UEBhMCQkUxGTAXBgNVBAoTEEdsb2JhbFNpZ24g
 # bnYtc2ExKDAmBgNVBAMTH0dsb2JhbFNpZ24gVGltZXN0YW1waW5nIENBIC0gRzIC
 # EhEh1pmnZJc+8fhCfukZzFNBFDAJBgUrDgMCGgUAoIH9MBgGCSqGSIb3DQEJAzEL
-# BgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTE4MDkwOTE5MTcwOVowIwYJKoZI
-# hvcNAQkEMRYEFIZ23Yy3kICXvtpLCJ/SwfiKFppUMIGdBgsqhkiG9w0BCRACDDGB
+# BgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTE4MDkxMjE2Mjg1M1owIwYJKoZI
+# hvcNAQkEMRYEFHw9ANPxEAr673EAke4Rx7NU8qm0MIGdBgsqhkiG9w0BCRACDDGB
 # jTCBijCBhzCBhAQUY7gvq2H1g5CWlQULACScUCkz7HkwbDBWpFQwUjELMAkGA1UE
 # BhMCQkUxGTAXBgNVBAoTEEdsb2JhbFNpZ24gbnYtc2ExKDAmBgNVBAMTH0dsb2Jh
 # bFNpZ24gVGltZXN0YW1waW5nIENBIC0gRzICEhEh1pmnZJc+8fhCfukZzFNBFDAN
-# BgkqhkiG9w0BAQEFAASCAQBG08KofGW8iCIzyY5EO1gWS2HY/RBm0xojTSodVmFx
-# aqSM2i/oEEQWryx6cOsdMoS3nYLdN/4ZHoBwN72dkkVSGZnTPffD4RSe4pOUyHTU
-# 6XjGp9tzM4nln9o+i5Bc2RSFp9upbzggW4yASqKvmdDicdsdqpJwkJDMKY9VWDDO
-# j4YNBZvzrUftauIfQhoWiTySxUHuUb211ELghDo5rlVJ22hj1CcHlk25jwPMA4z/
-# vysdWLPRaVfxHvMwpshZHh8FLhFUL9fvXW/7iqxQjw9x2pBBRcSgTdf2w81S0LtR
-# QCr690g8hq2TgZDW8IoqOCH2SKyWiOzquRg6DKe5GtoI
+# BgkqhkiG9w0BAQEFAASCAQBBZndiJYSktIFRRwbdcrbDvTM3T53s8LzMQbPpxCJO
+# kzzAlCsb1V4rHoJ7YtDQt4hQC33biG1W4A7AS+5PDr9G2sCoj2Hu2/4KdyCwKvD0
+# 8TChoQ8N3FyO/dxrmcjKOvc+ntMyppQ1JNGAYrgmkVpe0oDmrViCKG7W95IWw6WO
+# 7Oqm8UuqUdfaPEelZdvlqu1MhgGS3kW7pdPP6HwIlAa58+5CXAuC9supwKuuQKfX
+# QFKXYj49z3bUzFcTYm7lFenGmBsGP60h4OVGOTI+Udq2RrZ15iCHYgA4g8S3uJfR
+# v5vRTTc39cBtxjSnBeTRmEV52Ig2W2AKr1Pxjn7Cc8pk
 # SIG # End signature block
