@@ -602,7 +602,6 @@ function New-SamAccountName {
 					} while ($AllUsersAD.SamAccountName.Contains($samAccountName))
 				}
 			}
-			
 			default {
 				if (((($Grade -eq '12') -or ($Grade -eq 'TR')) -and ($currentMonth -ge '08') -and ($GradYear -le $currentYear)) -or ($GradYear -lt $currentYear)) { $GradYear = ($currentYear + 1) }
 				if ($GivenName.Length -ge '16') { $GivenName = $GivenName.substring(0, 16) }
@@ -1460,14 +1459,14 @@ function Write-SynergyExportFile {
 			}
 			default {
 				if ($LDAPAuth) {
-					foreach ($DN in $OrganizationalUnit) {
+					foreach ($DN in $OrganizationalUnit | Sort-Object | Get-Unique ) {
 						$users += Get-ADUser -SearchBase $DN -Filter { (Enabled -eq $true) } -Properties mail, employeeID, SamAccountName
 					}
 					$users | Where-Object { ($_.EmployeeID -match "^[\d\.]+$") -and ($_.Mail -ne $null) } | Select-Object employeeid, mail, SamAccountName | export-csv -delimiter "`t" -notypeinformation -append -path $Path
 					(Get-Content $Path) | ForEach-Object { $_ -replace '"', '' } | out-file -FilePath $Path -Force -Encoding ascii
 					(Get-Content $Path) | Select-Object -SkipLast 1 | Set-Content $Path
 				} else {
-					foreach ($DN in $OrganizationalUnit) {
+					foreach ($DN in $OrganizationalUnit | Sort-Object | Get-Unique ) {
 						$users += Get-ADUser -SearchBase $DN -Filter { (Enabled -eq $true) } -Properties mail, employeeID, assistant
 					}
 					$users | Where-Object { ($_.EmployeeID -match "^[\d\.]+$") -and ($_.Mail -ne $null) } | Select-Object employeeid, mail, assistant | export-csv -delimiter "`t" -notypeinformation -append -path $Path
@@ -1581,8 +1580,8 @@ try {
 # SIG # Begin signature block
 # MIId7QYJKoZIhvcNAQcCoIId3jCCHdoCAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCBWGxiuKRqTDEPL
-# fKz67A3Bw47egc/35RgpSA7+Myfkr6CCGK8wggPQMIICuKADAgECAhBWDzlgMpdv
+# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCDCuQ4g/uasmqlB
+# mTV5mH2JUSIWAOUMaOgFoeN5ARwC4KCCGK8wggPQMIICuKADAgECAhBWDzlgMpdv
 # skWlu9PmVks2MA0GCSqGSIb3DQEBCwUAMFoxEzARBgoJkiaJk/IsZAEZFgNvcmcx
 # GzAZBgoJkiaJk/IsZAEZFgtjYXNjYWRldGVjaDEVMBMGCgmSJomT8ixkARkWBWlu
 # dHJhMQ8wDQYDVQQDEwZDVEEtQ0EwHhcNMTUwODE4MjIwMDI3WhcNMzUwODE4MjIy
@@ -1718,25 +1717,25 @@ try {
 # GQYKCZImiZPyLGQBGRYLY2FzY2FkZXRlY2gxFTATBgoJkiaJk/IsZAEZFgVpbnRy
 # YTETMBEGA1UEAxMKQ1RBLUlOVC1DQQITTQAACNTm6lyP5isnXwAAAAAI1DANBglg
 # hkgBZQMEAgEFAKBMMBkGCSqGSIb3DQEJAzEMBgorBgEEAYI3AgEEMC8GCSqGSIb3
-# DQEJBDEiBCA2mZ/LJ475PEVsxznGFSAE0PIo1IpVHKZwHjLXwxYF+zANBgkqhkiG
-# 9w0BAQEFAASCAQAQemMN8llfn02KzU77tw6ArRGSNggdQuXIhSAD7GHH9u3cgADp
-# yg6LxetZ/looC0GJfNULKM1yJYRSPlA/eEYZkKyuROjpPRtffLaZ3PNUYyfmnkdv
-# OqpREsef2LtxiuVGlxGLeGqEHsatI9caZIHbDV02Jfc1/kqsR97ue6ALZbGWIy0c
-# Nh66kwGMXUEBMrOImkC8STZUZ2nJ6GwYOd2lpaOy0cWkk/b/YHUFd41NrqQ/bP0o
-# WA7cVklJCdareq1YPge8+xpDKGkZZwHoG8PTzAD18PIZB5uXdd05+y0RaGo9iDO3
-# s5SDXB52/5DSRLo323nolFMvaYC6wcipPVO0oYICojCCAp4GCSqGSIb3DQEJBjGC
+# DQEJBDEiBCA0ruDiRZyheycWDSFR7rhefjNla7DaXM1l58nftLK5JjANBgkqhkiG
+# 9w0BAQEFAASCAQBA+OxLQp+Z9UkQX1o+1z/AUu0UyTUvF9W3wEqnS7KHHHteVx+i
+# aCsRrEz2Ri04iBRJvX63wiLOn493EY4j1buOyzJ9sGwVk2OeztDolPmIw6pyz5py
+# SIRpNJenGzP/PqFWJBzk63LW/KT8iX+u1kmAIxGbSLD+EfI3uieCEPTtZcXg2zCv
+# xKJfu1HS/gEI29JdnbvHsHFnsg/N2pSwVXNsqVQKNRpzHZafagGU/SmpB/FYIIkx
+# eSHgtfxpeIW6b10/HhGkZQkE8JY12Ow0AiiqJoaKyah0B/teMqrkUVDAQUIHqFsp
+# +oCfWBl6nsh0RQzMppKa0OXe/pVk1Xl0acwSoYICojCCAp4GCSqGSIb3DQEJBjGC
 # Ao8wggKLAgEBMGgwUjELMAkGA1UEBhMCQkUxGTAXBgNVBAoTEEdsb2JhbFNpZ24g
 # bnYtc2ExKDAmBgNVBAMTH0dsb2JhbFNpZ24gVGltZXN0YW1waW5nIENBIC0gRzIC
 # EhEh1pmnZJc+8fhCfukZzFNBFDAJBgUrDgMCGgUAoIH9MBgGCSqGSIb3DQEJAzEL
-# BgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTE4MDkxMjE2Mjg1M1owIwYJKoZI
-# hvcNAQkEMRYEFHw9ANPxEAr673EAke4Rx7NU8qm0MIGdBgsqhkiG9w0BCRACDDGB
+# BgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTE4MDkyNzE1NTg0OFowIwYJKoZI
+# hvcNAQkEMRYEFJ9tMpJxfEZU/537/SUCedTXdjGXMIGdBgsqhkiG9w0BCRACDDGB
 # jTCBijCBhzCBhAQUY7gvq2H1g5CWlQULACScUCkz7HkwbDBWpFQwUjELMAkGA1UE
 # BhMCQkUxGTAXBgNVBAoTEEdsb2JhbFNpZ24gbnYtc2ExKDAmBgNVBAMTH0dsb2Jh
 # bFNpZ24gVGltZXN0YW1waW5nIENBIC0gRzICEhEh1pmnZJc+8fhCfukZzFNBFDAN
-# BgkqhkiG9w0BAQEFAASCAQBBZndiJYSktIFRRwbdcrbDvTM3T53s8LzMQbPpxCJO
-# kzzAlCsb1V4rHoJ7YtDQt4hQC33biG1W4A7AS+5PDr9G2sCoj2Hu2/4KdyCwKvD0
-# 8TChoQ8N3FyO/dxrmcjKOvc+ntMyppQ1JNGAYrgmkVpe0oDmrViCKG7W95IWw6WO
-# 7Oqm8UuqUdfaPEelZdvlqu1MhgGS3kW7pdPP6HwIlAa58+5CXAuC9supwKuuQKfX
-# QFKXYj49z3bUzFcTYm7lFenGmBsGP60h4OVGOTI+Udq2RrZ15iCHYgA4g8S3uJfR
-# v5vRTTc39cBtxjSnBeTRmEV52Ig2W2AKr1Pxjn7Cc8pk
+# BgkqhkiG9w0BAQEFAASCAQB6of2dPNC83ENpRyTeETgwSkv/16+PvuvdSuhi0Kjd
+# LLsMHcUtd1/8tiM+T9FyIJYGtw4zF8G3qv+g//NkYh1x2qZRi859Oiq1u0LeCRa0
+# V8GDtt/3u4PYYogCrZUk0vnbyQafRTzP/YwrtzTZzZUgwdG/vpygFSaKQ4qjBgsS
+# 2bVuttWB67XEmCTwl1ypa0fy4g3C0n/kikUpbZVKM+MR8REwBas/cgEVvHdM2f2e
+# s++P779oJHD4/27lWFmDdnGaRD1sseGhBwqY/fx84ud2l5XUXCdwHWWFshFF6FZL
+# ow7NLP8Hg25FT7WhbEca2sbPO+Ov12mPGuMQ1dY9B1Z7
 # SIG # End signature block
