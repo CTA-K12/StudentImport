@@ -1326,6 +1326,34 @@ function Update-StudentUserAD {
 					try { Set-ADUser -Identity $DataAD.SamAccountName -EmailAddress $DataImport.EmailAddress -UserPrincipalName $DataImport.UserPrincipalName -SamAccountName $DataImport.SamAccountName -PassThru | Rename-ADObject -NewName $DataImport.SamAccountName } catch { Write-Error ("Error: {0}" -f $_.Exception.Message) }
 				}
 			}
+			YAMHILL {
+				if (($DataImport.Title -eq '12') -or ($DataImport.Title -eq 'TR')) {
+					Set-ADAccountExpiration -Identity $DataAD.SamAccountName -DateTime ($DataImport.AccountExpirationDate).AddDays(+ 365)
+				} else {
+					Set-ADAccountExpiration -Identity $DataAD.SamAccountName -DateTime $DataImport.AccountExpirationDate
+				}
+				Set-ADUser -Identity $DataAD.SamAccountName -Title $DataImport.Title -Description $DataImport.Description -Department $DataImport.Department -Office $DataImport.Office
+				if ($DataAD.Surname -ne $DataImport.Surname) { Set-ADUser -Identity $DataAD.SamAccountName -Surname $DataImport.Surname -DisplayName $DataImport.DisplayName }
+				if ($DataAD.personalTitle -ne $DataImport.personalTitle) {
+					Set-ADUser -Identity $DataAD.SamAccountName -Clear personalTitle
+					Set-ADUser -Identity $DataAD.SamAccountName -Add @{ 'personalTitle' = "$($DataImport.personalTitle)" }
+				}
+				if ($userDataAD.Enabled -eq $false) {
+					$notify = $true
+					try {
+						Set-ADUser -Identity $DataAD.SamAccountName -Enabled $true
+					} catch {
+						Write-Error ("Error: {0}" -f $_.Exception.Message)
+						$notify = $false
+						continue
+					}
+				}
+				if ((($userDataAD.DistinguishedName -notlike ('*', $DataImport.Path -join '')) -and ($userDataAD.Office -ne $DataImport.Office)) -or ($userDataAD.DistinguishedName -like ('*Disabled*')) -or (($userDataAD.DistinguishedName -notlike ('*', $DataImport.Path -join '')) -and (($DataImport.SamAccountName.Substring($DataImport.SamAccountName.Length - 2) -ne $DataAD.SamAccountName.Substring($DataAD.SamAccountName.Length - 2)) -and (($DataImport.Title -eq '12') -or ($DataImport.Title -eq 'TR'))))) {
+					$notify = $true
+					if (!(Test-OrganizationalUnitPath -OrganizationalUnitDN $DataImport.Path).Result) { New-OrganizationalUnitPath -OrganizationalUnitDN $DataImport.Path -District $District }
+					try { Move-ADObject -Identity $userDataAD.DistinguishedName -targetpath $DataImport.Path } catch { Write-Error ("Error: {0}" -f $_.Exception.Message) }
+				}
+			}
 			default {
 				if (($DataImport.Title -eq '12') -or ($DataImport.Title -eq 'TR')) {
 					Set-ADAccountExpiration -Identity $DataAD.SamAccountName -DateTime ($DataImport.AccountExpirationDate).AddDays(+ 365)
@@ -1580,8 +1608,8 @@ try {
 # SIG # Begin signature block
 # MIId7QYJKoZIhvcNAQcCoIId3jCCHdoCAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCDCuQ4g/uasmqlB
-# mTV5mH2JUSIWAOUMaOgFoeN5ARwC4KCCGK8wggPQMIICuKADAgECAhBWDzlgMpdv
+# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCBvifFACy/8XJ9D
+# 5I4g/noAVvZAGT8Z6ce23q/lqAktIKCCGK8wggPQMIICuKADAgECAhBWDzlgMpdv
 # skWlu9PmVks2MA0GCSqGSIb3DQEBCwUAMFoxEzARBgoJkiaJk/IsZAEZFgNvcmcx
 # GzAZBgoJkiaJk/IsZAEZFgtjYXNjYWRldGVjaDEVMBMGCgmSJomT8ixkARkWBWlu
 # dHJhMQ8wDQYDVQQDEwZDVEEtQ0EwHhcNMTUwODE4MjIwMDI3WhcNMzUwODE4MjIy
@@ -1717,25 +1745,25 @@ try {
 # GQYKCZImiZPyLGQBGRYLY2FzY2FkZXRlY2gxFTATBgoJkiaJk/IsZAEZFgVpbnRy
 # YTETMBEGA1UEAxMKQ1RBLUlOVC1DQQITTQAACNTm6lyP5isnXwAAAAAI1DANBglg
 # hkgBZQMEAgEFAKBMMBkGCSqGSIb3DQEJAzEMBgorBgEEAYI3AgEEMC8GCSqGSIb3
-# DQEJBDEiBCA0ruDiRZyheycWDSFR7rhefjNla7DaXM1l58nftLK5JjANBgkqhkiG
-# 9w0BAQEFAASCAQBA+OxLQp+Z9UkQX1o+1z/AUu0UyTUvF9W3wEqnS7KHHHteVx+i
-# aCsRrEz2Ri04iBRJvX63wiLOn493EY4j1buOyzJ9sGwVk2OeztDolPmIw6pyz5py
-# SIRpNJenGzP/PqFWJBzk63LW/KT8iX+u1kmAIxGbSLD+EfI3uieCEPTtZcXg2zCv
-# xKJfu1HS/gEI29JdnbvHsHFnsg/N2pSwVXNsqVQKNRpzHZafagGU/SmpB/FYIIkx
-# eSHgtfxpeIW6b10/HhGkZQkE8JY12Ow0AiiqJoaKyah0B/teMqrkUVDAQUIHqFsp
-# +oCfWBl6nsh0RQzMppKa0OXe/pVk1Xl0acwSoYICojCCAp4GCSqGSIb3DQEJBjGC
+# DQEJBDEiBCCk3/h12I86XbNsrcXK5YdbkdwhBvtGroblIEYekfjKZzANBgkqhkiG
+# 9w0BAQEFAASCAQBMA+VziTaIxjbLrGlAYtthSmtePCCItxKKDgHfefHK7A/YnDeU
+# bsH++7/0UvYvqfqjP1jE3QCLSBwISNNRI6zYs639CFxzmu+jOZYQBd0op9WFTHac
+# e4U2a/RxSt9IFdRjzddSB1Zj/eldDCu/+GPBdR6+jcyt8HERiP5Ked7XjpeWjQqA
+# anenC1W9BTPFrrKWeGUmWVpl/IuAq82R6GKat60SX7LH10yoXR1h+n4MGKFeKyzl
+# eDmXDKIzhDnz9n779g+ggkKIg/Q2zHovZRcl9ZBStVJZeePf0BSNO/VaAX4ytTIe
+# Ibv1mGWUjMRRMdN9DCvWr6X9tahRiexC+1dhoYICojCCAp4GCSqGSIb3DQEJBjGC
 # Ao8wggKLAgEBMGgwUjELMAkGA1UEBhMCQkUxGTAXBgNVBAoTEEdsb2JhbFNpZ24g
 # bnYtc2ExKDAmBgNVBAMTH0dsb2JhbFNpZ24gVGltZXN0YW1waW5nIENBIC0gRzIC
 # EhEh1pmnZJc+8fhCfukZzFNBFDAJBgUrDgMCGgUAoIH9MBgGCSqGSIb3DQEJAzEL
-# BgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTE4MDkyNzE1NTg0OFowIwYJKoZI
-# hvcNAQkEMRYEFJ9tMpJxfEZU/537/SUCedTXdjGXMIGdBgsqhkiG9w0BCRACDDGB
+# BgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTE4MTAwODE4MTIxNlowIwYJKoZI
+# hvcNAQkEMRYEFCEVRNpcagoCZ9hRliPi4ROqPdaGMIGdBgsqhkiG9w0BCRACDDGB
 # jTCBijCBhzCBhAQUY7gvq2H1g5CWlQULACScUCkz7HkwbDBWpFQwUjELMAkGA1UE
 # BhMCQkUxGTAXBgNVBAoTEEdsb2JhbFNpZ24gbnYtc2ExKDAmBgNVBAMTH0dsb2Jh
 # bFNpZ24gVGltZXN0YW1waW5nIENBIC0gRzICEhEh1pmnZJc+8fhCfukZzFNBFDAN
-# BgkqhkiG9w0BAQEFAASCAQB6of2dPNC83ENpRyTeETgwSkv/16+PvuvdSuhi0Kjd
-# LLsMHcUtd1/8tiM+T9FyIJYGtw4zF8G3qv+g//NkYh1x2qZRi859Oiq1u0LeCRa0
-# V8GDtt/3u4PYYogCrZUk0vnbyQafRTzP/YwrtzTZzZUgwdG/vpygFSaKQ4qjBgsS
-# 2bVuttWB67XEmCTwl1ypa0fy4g3C0n/kikUpbZVKM+MR8REwBas/cgEVvHdM2f2e
-# s++P779oJHD4/27lWFmDdnGaRD1sseGhBwqY/fx84ud2l5XUXCdwHWWFshFF6FZL
-# ow7NLP8Hg25FT7WhbEca2sbPO+Ov12mPGuMQ1dY9B1Z7
+# BgkqhkiG9w0BAQEFAASCAQBeE5ZN6aymABRZuEeItouD6Wi7JqDcFLPcQJZfgPJn
+# XMQS82O6RltC7SpM9Wgk13HJbAu6jPfnskm3lWq3MFrWZfAbFGuLYkZSy9/4S3uX
+# Xoe6mGX0Z/tkNAkpwlq6uPAPsy/WmiYSp3UgypEBpe1puQvDZzqaWV4HA5lkJW2Q
+# i5g9qOnduSMWrd39z8ipOaMhDLO2PxTwKMOFiwcEYNdWkGIqNcDk1ksCTB+EI4kt
+# s6/Ljnnv6K+UunwiCQa9Tn5Hd1sFqFF01YCgdVfIew35W1jL7hXJlS7BVP+ltt6M
+# Ez7f+SFiXznaMIF8w9aXcQ1/F6Ead1sZ6k1dLsF+d52O
 # SIG # End signature block
