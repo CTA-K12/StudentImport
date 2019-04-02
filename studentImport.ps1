@@ -305,10 +305,15 @@ function Move-SuspendedAccounts {
 		foreach ($DN in $MoveFromOU) {
 			if ($DN -contains 'Disabled') { continue }
 			try {
-				Search-ADAccount –AccountDisabled –UsersOnly –SearchBase $DN | Move-ADObject –TargetPath $MoveToOU
+				Search-ADAccount -AccountDisabled -UsersOnly -SearchBase $DN | Move-ADObject -TargetPath $MoveToOU
 			} catch {
 				Write-Error ("Error: {0}" -f $_.Exception.Message)
 			}
+		}
+		try {
+			Search-ADAccount -AccountDisabled -UsersOnly -SearchBase $MoveToOU | Clear-ADAccountExpiration
+		} catch {
+			Write-Error ("Error: {0}" -f $_.Exception.Message)
 		}
 	}
 	end {
@@ -362,11 +367,72 @@ function New-EmailAddress {
 		Write-LogEntry -Severity 1 -Value "End $($MyInvocation.MyCommand)"
 	}
 }
-function New-GroupAD {
+function Update-GroupAD {
 	[CmdletBinding()]
-	param ()
+	param
+	(
+		[Parameter(Mandatory = $true)]
+		[System.String]$sAMAccountName,
+		[Parameter(Mandatory = $true)]
+		[System.String]$GroupsOU,
+		[Parameter(Mandatory = $true)]
+		[System.String]$GradYear,
+		[Parameter(Mandatory = $true)]
+		[System.String]$Grade,
+		[Parameter(Mandatory = $true)]
+		[System.String]$Location,
+		[Parameter(Mandatory = $false)]
+		[System.String]$HomeroomTeacher
+	)
 	
-	New-ADGroup -Name $physicalDeliveryOfficeNameRedux -GroupCategory Security -GroupScope Global -Path "OU=Meraki,OU=Groups,DC=intra,DC=parkrose,DC=k12,DC=or,DC=us"
+	begin {
+		Write-Verbose "Begin $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "Begin $($MyInvocation.MyCommand)"
+		$FunctionStopWatch = [System.Diagnostics.Stopwatch]::StartNew()
+	}
+	process {
+		
+		if ($HomeroomTeacher) {
+			$HomeroomTeacherArray = $HomeroomTeacher.Split(',') -replace '\s', '' -replace "'", "" -replace '`', '' -replace ',', '' -replace '\.', ''
+			$HomeroomTeacher = 'Homeroom - ' + $HomeroomTeacherArray[1] + " " + $HomeroomTeacherArray[0]
+		} else { $HomeroomTeacher = 'Homeroom - No Homeroom' }
+		
+		$GradYear = 'Grad Year', $GradYear -join " - "
+		$Grade = 'Grade', $grade -join " - "
+		$Location = 'Location', $Location -join " - "
+		
+		if ((-not (Get-ADGroup -Filter { sAMAccountName -eq $HomeroomTeacher }))) { New-ADGroup -Name "$HomeroomTeacher" -GroupCategory Security -GroupScope Global -Path "$GroupsOU" }
+		if (-not (Get-ADGroup -Filter { sAMAccountName -eq $Location })) { New-ADGroup -Name "$Location" -GroupCategory Security -GroupScope Global -Path "$GroupsOU" }
+		if (-not (Get-ADGroup -Filter { sAMAccountName -eq $Grade })) { New-ADGroup -Name "$Grade" -GroupCategory Security -GroupScope Global -Path "$GroupsOU" }
+		if (-not (Get-ADGroup -Filter { sAMAccountName -eq $GradYear })) { New-ADGroup -Name "$GradYear" -GroupCategory Security -GroupScope Global -Path "$GroupsOU" }
+		
+		if (-not ((Get-ADUser -Identity $sAMAccountName -Properties MemberOf).MemberOf -like "CN=$HomeroomTeacher*")) {
+			$GroupDN = ((Get-ADUser -Identity $sAMAccountName -Properties MemberOf).MemberOf -like "CN=Homeroom -*")
+			if ($GroupDN) { Remove-ADGroupMember -Identity "$GroupDN" -Members $sAMAccountName -Confirm:$false }
+			Add-ADGroupMember -Identity $HomeroomTeacher -Members $sAMAccountName
+		}
+		if (-not ((Get-ADUser -Identity $sAMAccountName -Properties MemberOf).MemberOf -like "CN=$Location*")) {
+			$GroupDN = ((Get-ADUser -Identity $sAMAccountName -Properties MemberOf).MemberOf -like "CN=Location -*")
+			if ($GroupDN) { Remove-ADGroupMember -Identity "$GroupDN" -Members $sAMAccountName -Confirm:$false }
+			Add-ADGroupMember -Identity $Location -Members $sAMAccountName
+		}
+		if (-not ((Get-ADUser -Identity $sAMAccountName -Properties MemberOf).MemberOf -like "CN=$Grade*")) {
+			$GroupDN = ((Get-ADUser -Identity $sAMAccountName -Properties MemberOf).MemberOf -like "CN=Grade -*")
+			if ($GroupDN) { Remove-ADGroupMember -Identity "$GroupDN" -Members $sAMAccountName -Confirm:$false }
+			Add-ADGroupMember -Identity $Grade -Members $sAMAccountName
+		}
+		if (-not ((Get-ADUser -Identity $sAMAccountName -Properties MemberOf).MemberOf -like "CN=$GradYear*")) {
+			$GroupDN = ((Get-ADUser -Identity $sAMAccountName -Properties MemberOf).MemberOf -like "CN=Grad Year -*")
+			if ($GroupDN) { Remove-ADGroupMember -Identity "$GroupDN" -Members $sAMAccountName -Confirm:$false }
+			Add-ADGroupMember -Identity $GradYear -Members $sAMAccountName
+		}
+	}
+	end {
+		$FunctionStopWatch.Stop()
+		Write-Verbose "$($MyInvocation.MyCommand) Took $($FunctionStopWatch.Elapsed.TotalMilliseconds) Milliseconds"
+		Write-Verbose "End $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "End $($MyInvocation.MyCommand)"
+	}
 }
 function New-OrganizationalUnitPath {
 	[CmdletBinding()]
@@ -499,26 +565,28 @@ function New-SamAccountName {
 	(
 		[Parameter(Mandatory = $true,
 				   ValueFromPipelineByPropertyName = $true)]
-		[string]$GivenName,
+		[System.String]$GivenName,
 		[Parameter(Mandatory = $true,
 				   ValueFromPipelineByPropertyName = $true)]
-		[string]$SurName,
+		[System.String]$SurName,
 		[Parameter(Mandatory = $true,
 				   ValueFromPipelineByPropertyName = $true)]
-		[string]$GradYear,
+		[System.String]$GradYear,
 		[Parameter(Mandatory = $true,
 				   ValueFromPipelineByPropertyName = $true)]
-		[string]$UPNSuffiix,
+		[System.String]$UPNSuffiix,
 		[Parameter(Mandatory = $true,
 				   ValueFromPipelineByPropertyName = $true)]
-		[string]$Grade,
+		[System.String]$Grade,
 		[Parameter(Mandatory = $true,
 				   ValueFromPipelineByPropertyName = $true)]
-		[array]$AllUsersAD,
+		[System.Array]$AllUsersAD,
 		[Parameter(Mandatory = $true,
 				   ValueFromPipelineByPropertyName = $true)]
-		[string]$District
+		[System.String]$District,
+		[System.String]$CurrerntSamAccountName
 	)
+	
 	begin {
 		Write-Verbose "Begin $($MyInvocation.MyCommand)"
 		Write-LogEntry -Severity 1 -Value "Begin $($MyInvocation.MyCommand)"
@@ -535,23 +603,25 @@ function New-SamAccountName {
 				$samAccountName = $samAccountName.ToLower() -replace '\s', '' -replace "'", "" -replace '`', '' -replace ',', '' -replace '\.', '' -replace '-', ''
 				if ($sAMAccountName.Length -ge '18') { $sAMAccountName = $sAMAccountName.substring(0, 18) }
 				$samAccountName = $samAccountName, $GradYear.Substring($GradYear.get_Length() - 2) -join ''
-				if (($AllUsersAD.SamAccountName.Contains($samAccountName)) -and (($SurName.Length -gt '1'))) {
-					$i = 1
-					Do {
-						$i++
-						Write-Verbose $i
-						Write-Verbose $samAccountName
-						if ($sAMAccountName.Length -ge '20') {
-							if ($GivenName.Length -ge '19') { $GivenName = $GivenName.substring(0, 19) }
-							$samAccountName = $GivenName.subString(0, $GivenName.get_Length() - $i), $SurName.substring(0, $i) -join ''
-							$samAccountName = $samAccountName.ToLower() -replace '\s', '' -replace "'", "" -replace '`', '' -replace ',', '' -replace '\.', '' -replace '-', ''
-							if ($sAMAccountName.Length -gt '19') { $sAMAccountName = $sAMAccountName.substring(0, 19) }
-							$samAccountName = $samAccountName, $GradYear.Substring($GradYear.get_Length() - 2) -join ''
-						} else {
-							$samAccountName = $GivenName, $SurName.substring(0, $i), $GradYear.Substring($GradYear.get_Length() - 2) -join ''
-							$samAccountName = $samAccountName.ToLower() -replace '\s', '' -replace "'", "" -replace '`', '' -replace ',', '' -replace '\.', '' -replace '-', ''
-						}
-					} while ($AllUsersAD.SamAccountName.Contains($samAccountName))
+				if (($CurrerntSamAccountName -ne $null) -and ($samAccountName -ne $CurrerntSamAccountName)) {
+					if (($AllUsersAD.SamAccountName.Contains($samAccountName)) -and (($SurName.Length -gt '1'))) {
+						$i = 1
+						Do {
+							$i++
+							Write-Verbose $i
+							Write-Verbose $samAccountName
+							if ($sAMAccountName.Length -ge '20') {
+								if ($GivenName.Length -ge '19') { $GivenName = $GivenName.substring(0, 19) }
+								$samAccountName = $GivenName.subString(0, $GivenName.get_Length() - $i), $SurName.substring(0, $i) -join ''
+								$samAccountName = $samAccountName.ToLower() -replace '\s', '' -replace "'", "" -replace '`', '' -replace ',', '' -replace '\.', '' -replace '-', ''
+								if ($sAMAccountName.Length -gt '19') { $sAMAccountName = $sAMAccountName.substring(0, 19) }
+								$samAccountName = $samAccountName, $GradYear.Substring($GradYear.get_Length() - 2) -join ''
+							} else {
+								$samAccountName = $GivenName, $SurName.substring(0, $i), $GradYear.Substring($GradYear.get_Length() - 2) -join ''
+								$samAccountName = $samAccountName.ToLower() -replace '\s', '' -replace "'", "" -replace '`', '' -replace ',', '' -replace '\.', '' -replace '-', ''
+							}
+						} while ($AllUsersAD.SamAccountName.Contains($samAccountName))
+					}
 				}
 			}
 			GASTONSD {
@@ -561,21 +631,23 @@ function New-SamAccountName {
 				$samAccountName = $samAccountName.ToLower() -replace '\s', '' -replace "'", "" -replace '`', '' -replace ',', '' -replace '\.', '' -replace '-', ''
 				if ($sAMAccountName.Length -ge '18') { $sAMAccountName = $sAMAccountName.substring(0, 18) }
 				$samAccountName = $samAccountName, $GradYear.Substring($GradYear.get_Length() - 2) -join ''
-				if (($AllUsersAD.SamAccountName.Contains($samAccountName)) -and (($SurName.Length -gt '1'))) {
-					$i = 1
-					Do {
-						$i++
-						if ($sAMAccountName.Length -ge '20') {
-							if ($GivenName.Length -ge '19') { $GivenName = $GivenName.substring(0, 19) }
-							$samAccountName = $GivenName.subString(0, $GivenName.get_Length() - $i), $SurName.substring(0, $i) -join ''
-							$samAccountName = $samAccountName.ToLower() -replace '\s', '' -replace "'", "" -replace '`', '' -replace ',', '' -replace '\.', '' -replace '-', ''
-							if ($sAMAccountName.Length -gt '19') { $sAMAccountName = $sAMAccountName.substring(0, 19) }
-							$samAccountName = $samAccountName, $GradYear.Substring($GradYear.get_Length() - 2) -join ''
-						} else {
-							$samAccountName = $GivenName, $SurName.substring(0, $i), $GradYear.Substring($GradYear.get_Length() - 2) -join ''
-							$samAccountName = $samAccountName.ToLower() -replace '\s', '' -replace "'", "" -replace '`', '' -replace ',', '' -replace '\.', '' -replace '-', ''
-						}
-					} while ($AllUsersAD.SamAccountName.Contains($samAccountName))
+				if (($CurrerntSamAccountName -ne $null) -and ($samAccountName -ne $CurrerntSamAccountName)) {
+					if (($AllUsersAD.SamAccountName.Contains($samAccountName)) -and (($SurName.Length -gt '1'))) {
+						$i = 1
+						Do {
+							$i++
+							if ($sAMAccountName.Length -ge '20') {
+								if ($GivenName.Length -ge '19') { $GivenName = $GivenName.substring(0, 19) }
+								$samAccountName = $GivenName.subString(0, $GivenName.get_Length() - $i), $SurName.substring(0, $i) -join ''
+								$samAccountName = $samAccountName.ToLower() -replace '\s', '' -replace "'", "" -replace '`', '' -replace ',', '' -replace '\.', '' -replace '-', ''
+								if ($sAMAccountName.Length -gt '19') { $sAMAccountName = $sAMAccountName.substring(0, 19) }
+								$samAccountName = $samAccountName, $GradYear.Substring($GradYear.get_Length() - 2) -join ''
+							} else {
+								$samAccountName = $GivenName, $SurName.substring(0, $i), $GradYear.Substring($GradYear.get_Length() - 2) -join ''
+								$samAccountName = $samAccountName.ToLower() -replace '\s', '' -replace "'", "" -replace '`', '' -replace ',', '' -replace '\.', '' -replace '-', ''
+							}
+						} while ($AllUsersAD.SamAccountName.Contains($samAccountName))
+					}
 				}
 			}
 			SEASIDE {
@@ -585,21 +657,23 @@ function New-SamAccountName {
 				$samAccountName = $samAccountName.ToLower() -replace '\s', '' -replace "'", "" -replace '`', '' -replace ',', '' -replace '\.', '' -replace '-', ''
 				if ($sAMAccountName.Length -ge '18') { $sAMAccountName = $sAMAccountName.substring(0, 18) }
 				$samAccountName = $GradYear.Substring($GradYear.get_Length() - 2), $samAccountName -join ''
-				if (($AllUsersAD.SamAccountName.Contains($samAccountName)) -and (($SurName.Length -gt '1'))) {
-					$i = 1
-					Do {
-						$i++
-						if ($sAMAccountName.Length -ge '20') {
-							if ($GivenName.Length -ge '19') { $GivenName = $GivenName.substring(0, 19) }
-							$samAccountName = $GivenName.subString(0, $GivenName.get_Length() - $i), $SurName.substring(0, $i) -join ''
-							$samAccountName = $samAccountName.ToLower() -replace '\s', '' -replace "'", "" -replace '`', '' -replace ',', '' -replace '\.', '' -replace '-', ''
-							if ($sAMAccountName.Length -gt '19') { $sAMAccountName = $sAMAccountName.substring(0, 19) }
-							$samAccountName = $GradYear.Substring($GradYear.get_Length() - 2), $samAccountName -join ''
-						} else {
-							$samAccountName = $GradYear.Substring($GradYear.get_Length() - 2), $GivenName, $SurName.substring(0, $i) -join ''
-							$samAccountName = $samAccountName.ToLower() -replace '\s', '' -replace "'", "" -replace '`', '' -replace ',', '' -replace '\.', '' -replace '-', ''
-						}
-					} while ($AllUsersAD.SamAccountName.Contains($samAccountName))
+				if (($CurrerntSamAccountName -ne $null) -and ($samAccountName -ne $CurrerntSamAccountName)) {
+					if (($AllUsersAD.SamAccountName.Contains($samAccountName)) -and (($SurName.Length -gt '1'))) {
+						$i = 1
+						Do {
+							$i++
+							if ($sAMAccountName.Length -ge '20') {
+								if ($GivenName.Length -ge '19') { $GivenName = $GivenName.substring(0, 19) }
+								$samAccountName = $GivenName.subString(0, $GivenName.get_Length() - $i), $SurName.substring(0, $i) -join ''
+								$samAccountName = $samAccountName.ToLower() -replace '\s', '' -replace "'", "" -replace '`', '' -replace ',', '' -replace '\.', '' -replace '-', ''
+								if ($sAMAccountName.Length -gt '19') { $sAMAccountName = $sAMAccountName.substring(0, 19) }
+								$samAccountName = $GradYear.Substring($GradYear.get_Length() - 2), $samAccountName -join ''
+							} else {
+								$samAccountName = $GradYear.Substring($GradYear.get_Length() - 2), $GivenName, $SurName.substring(0, $i) -join ''
+								$samAccountName = $samAccountName.ToLower() -replace '\s', '' -replace "'", "" -replace '`', '' -replace ',', '' -replace '\.', '' -replace '-', ''
+							}
+						} while ($AllUsersAD.SamAccountName.Contains($samAccountName))
+					}
 				}
 			}
 			default {
@@ -609,21 +683,23 @@ function New-SamAccountName {
 				$samAccountName = $samAccountName.ToLower() -replace '\s', '' -replace "'", "" -replace '`', '' -replace ',', '' -replace '\.', '' -replace '-', ''
 				if ($sAMAccountName.Length -ge '16') { $sAMAccountName = $sAMAccountName.substring(0, 16) }
 				$samAccountName = $samAccountName, $GradYear -join ''
-				if (($AllUsersAD.SamAccountName.Contains($samAccountName)) -and (($SurName.Length -gt '1'))) {
-					$i = 1
-					Do {
-						$i++
-						if ($sAMAccountName.Length -ge '20') {
-							if ($GivenName.Length -ge '17') { $GivenName = $GivenName.substring(0, 17) }
-							$samAccountName = $GivenName.subString(0, $GivenName.get_Length() - $i), $SurName.substring(0, $i) -join ''
-							$samAccountName = $samAccountName.ToLower() -replace '\s', '' -replace "'", "" -replace '`', '' -replace ',', '' -replace '\.', '' -replace '-', ''
-							if ($sAMAccountName.Length -gt '17') { $sAMAccountName = $sAMAccountName.substring(0, 17) }
-							$samAccountName = $samAccountName, $GradYear -join ''
-						} else {
-							$samAccountName = $GivenName, $SurName.substring(0, $i), $GradYear -join ''
-							$samAccountName = $samAccountName.ToLower() -replace '\s', '' -replace "'", "" -replace '`', '' -replace ',', '' -replace '\.', '' -replace '-', ''
-						}
-					} while ($AllUsersAD.SamAccountName.Contains($samAccountName))
+				if (($CurrerntSamAccountName -ne $null) -and ($samAccountName -ne $CurrerntSamAccountName)) {
+					if (($AllUsersAD.SamAccountName.Contains($samAccountName)) -and (($SurName.Length -gt '1'))) {
+						$i = 1
+						Do {
+							$i++
+							if ($sAMAccountName.Length -ge '20') {
+								if ($GivenName.Length -ge '17') { $GivenName = $GivenName.substring(0, 17) }
+								$samAccountName = $GivenName.subString(0, $GivenName.get_Length() - $i), $SurName.substring(0, $i) -join ''
+								$samAccountName = $samAccountName.ToLower() -replace '\s', '' -replace "'", "" -replace '`', '' -replace ',', '' -replace '\.', '' -replace '-', ''
+								if ($sAMAccountName.Length -gt '17') { $sAMAccountName = $sAMAccountName.substring(0, 17) }
+								$samAccountName = $samAccountName, $GradYear -join ''
+							} else {
+								$samAccountName = $GivenName, $SurName.substring(0, $i), $GradYear -join ''
+								$samAccountName = $samAccountName.ToLower() -replace '\s', '' -replace "'", "" -replace '`', '' -replace ',', '' -replace '\.', '' -replace '-', ''
+							}
+						} while ($AllUsersAD.SamAccountName.Contains($samAccountName))
+					}
 				}
 			}
 		}
@@ -705,6 +781,25 @@ function New-StudentUserAD {
 			$script:userDataImport.Notify = $false
 			continue
 		}
+	}
+	end {
+		$FunctionStopWatch.Stop()
+		Write-Verbose "$($MyInvocation.MyCommand) Took $($FunctionStopWatch.Elapsed.TotalMilliseconds) Milliseconds"
+		Write-Verbose "End $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "End $($MyInvocation.MyCommand)"
+	}
+}
+function New-StudentContactExchange {
+	[CmdletBinding()]
+	param ()
+	
+	begin {
+		Write-Verbose "Begin $($MyInvocation.MyCommand)"
+		Write-LogEntry -Severity 1 -Value "Begin $($MyInvocation.MyCommand)"
+		$FunctionStopWatch = [System.Diagnostics.Stopwatch]::StartNew()
+	}
+	process {
+		
 	}
 	end {
 		$FunctionStopWatch.Stop()
@@ -840,7 +935,7 @@ function New-UserShare {
 		Write-LogEntry -Severity 1 -Value "End $($MyInvocation.MyCommand)"
 	}
 }
-function Publish-FileSCP {
+function Send-FileSCP {
 	[CmdletBinding()]
 	param
 	(
@@ -928,7 +1023,8 @@ function Read-ConfigXML {
 		[switch]$WriteSynergyExport,
 		[switch]$NewStudentUserGoogle,
 		[switch]$Notification,
-		[switch]$GetSynergyImport
+		[switch]$GetSynergyImport,
+		[switch]$UpdateGroupAD
 	)
 	begin {
 		Write-Verbose "Begin $($MyInvocation.MyCommand)"
@@ -940,131 +1036,139 @@ function Read-ConfigXML {
 		$Location = $Location.Split("\\\(\)\'./")[0]
 		if ($Script) {
 			$properties = @{
-				UPNSuffix = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig" | Select-Object –ExpandProperty Node).UPNSuffix
-				EmailSuffix = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig" | Select-Object –ExpandProperty Node).EmailSuffix
-				studentsOUs = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location" | Select-Object –ExpandProperty Node).Path | Get-Unique
-				Locations = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location" | Select-Object –ExpandProperty Node)
-				SkipGrades = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Skip/Grades" | Select-Object –ExpandProperty Node).Grade
-				SkipLocations = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Skip/Locations" | Select-Object –ExpandProperty Node).Location
-				SkipStudents = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Skip/Students" | Select-Object –ExpandProperty Node).Student
-				AccountExpirationDate = (get-date).AddDays(+ ([convert]::ToInt32((Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig" | Select-Object –ExpandProperty Node).AccountExpirationDate)))
-				PasswordNeverExpires = ([System.Convert]::ToBoolean((Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Password" | Select-Object –ExpandProperty Node).PasswordNeverExpires))
-				CannotChangePassword = ([System.Convert]::ToBoolean((Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Password" | Select-Object –ExpandProperty Node).CannotChangePassword))
-				ChangePasswordAtNextLogon = ([System.Convert]::ToBoolean((Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Password" | Select-Object –ExpandProperty Node).ChangePasswordAtNextLogon))
-				ImportCSVPath = $PSScriptRoot, (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']/Download" | Select-Object –ExpandProperty Node).PathLocal -join '\'
+				UPNSuffix = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig" | Select-Object -ExpandProperty Node).UPNSuffix
+				EmailSuffix = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig" | Select-Object -ExpandProperty Node).EmailSuffix
+				studentsOUs = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location" | Select-Object -ExpandProperty Node).Path | Get-Unique
+				Locations = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location" | Select-Object -ExpandProperty Node)
+				SkipGrades = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Skip/Grades" | Select-Object -ExpandProperty Node).Grade
+				SkipLocations = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Skip/Locations" | Select-Object -ExpandProperty Node).Location
+				SkipStudents = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Skip/Students" | Select-Object -ExpandProperty Node).Student
+				AccountExpirationDate = (get-date).AddDays(+ ([convert]::ToInt32((Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig" | Select-Object -ExpandProperty Node).AccountExpirationDate)))
+				PasswordNeverExpires = ([System.Convert]::ToBoolean((Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Password" | Select-Object -ExpandProperty Node).PasswordNeverExpires))
+				CannotChangePassword = ([System.Convert]::ToBoolean((Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Password" | Select-Object -ExpandProperty Node).CannotChangePassword))
+				ChangePasswordAtNextLogon = ([System.Convert]::ToBoolean((Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Password" | Select-Object -ExpandProperty Node).ChangePasswordAtNextLogon))
+				ImportCSVPath = $PSScriptRoot, (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']/Download" | Select-Object -ExpandProperty Node).PathLocal -join '\'
+			}
+			$ConfigObj = New-Object -TypeName PSObject -Property $properties
+			Write-Output $ConfigObj
+		}
+		if ($UpdateGroupAD) {
+			$properties = @{
+				ADGroupOU = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig" | Select-Object -ExpandProperty Node).ADGroupOU
 			}
 			$ConfigObj = New-Object -TypeName PSObject -Property $properties
 			Write-Output $ConfigObj
 		}
 		if ($NewUserShare) {
 			$properties = @{
-				netBIOSDomainName = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig" | Select-Object –ExpandProperty Node).NetBIOSDomainName
-				PathOnDrive	      = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location[@Name[contains(.,'$Location')]]/UserShare" | Select-Object –ExpandProperty Node).PathOnDrive
-				DriveLetter	      = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location[@Name[contains(.,'$Location')]]/UserShare" | Select-Object –ExpandProperty Node).DriveLetter
-				HomeDirectoryServer = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location[@Name[contains(.,'$location')]]/UserShare" | Select-Object –ExpandProperty Node).Server
-				HomeDrive		  = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location[@Name[contains(.,'$location')]]" | Select-Object –ExpandProperty Node).HomeDrive
+				netBIOSDomainName = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig" | Select-Object -ExpandProperty Node).NetBIOSDomainName
+				PathOnDrive	      = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location[@Name[contains(.,'$Location')]]/UserShare" | Select-Object -ExpandProperty Node).PathOnDrive
+				DriveLetter	      = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location[@Name[contains(.,'$Location')]]/UserShare" | Select-Object -ExpandProperty Node).DriveLetter
+				HomeDirectoryServer = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location[@Name[contains(.,'$location')]]/UserShare" | Select-Object -ExpandProperty Node).Server
+				HomeDrive		  = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location[@Name[contains(.,'$location')]]" | Select-Object -ExpandProperty Node).HomeDrive
 			}
 			$ConfigObj = New-Object -TypeName PSObject -Property $properties
 			Write-Output $ConfigObj
 		}
 		if ($NewPassword) {
 			$properties = @{
-				Words = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Password/Words" | Select-Object –ExpandProperty Node).Word
-				SpecialCharacters = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Password/SpecialCharacters" | Select-Object –ExpandProperty Node).Character
-				Numbers = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Password/Numbers" | Select-Object –ExpandProperty Node).Number
-				UseDefaultPassword = ([System.Convert]::ToBoolean((Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Password" | Select-Object –ExpandProperty Node).UseDefaultPassword))
-				DefaultPasswordIsStudentID = ([System.Convert]::ToBoolean((Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Password" | Select-Object –ExpandProperty Node).DefaultPasswordIsStudentID))
-				DefaultPassword = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Password" | Select-Object –ExpandProperty Node).DefaultPassword
-				DOBPasswordGrade = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Password" | Select-Object –ExpandProperty Node).DOBPasswordGrade
-				DOBPasswordLocations = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Password/DOBPasswordLocations" | Select-Object –ExpandProperty Node).Location
+				Words = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Password/Words" | Select-Object -ExpandProperty Node).Word
+				SpecialCharacters = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Password/SpecialCharacters" | Select-Object -ExpandProperty Node).Character
+				Numbers = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Password/Numbers" | Select-Object -ExpandProperty Node).Number
+				UseDefaultPassword = ([System.Convert]::ToBoolean((Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Password" | Select-Object -ExpandProperty Node).UseDefaultPassword))
+				DefaultPasswordIsStudentID = ([System.Convert]::ToBoolean((Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Password" | Select-Object -ExpandProperty Node).DefaultPasswordIsStudentID))
+				DefaultPassword = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Password" | Select-Object -ExpandProperty Node).DefaultPassword
+				DOBPasswordGrade = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Password" | Select-Object -ExpandProperty Node).DOBPasswordGrade
+				DOBPasswordLocations = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Password/DOBPasswordLocations" | Select-Object -ExpandProperty Node).Location
 			}
 			$ConfigObj = New-Object -TypeName PSObject -Property $properties
 			Write-Output $ConfigObj
 		}
 		if ($GetSynergyImport) {
 			$properties = @{
-				HostName = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']" | Select-Object –ExpandProperty Node).Hostname
-				UserName = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']" | Select-Object –ExpandProperty Node).Username
-				Password = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']" | Select-Object –ExpandProperty Node).Password
-				SshHostKeyFingerprint = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']" | Select-Object –ExpandProperty Node).HostKeyFingerprint
-				RemoteFilePath = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']/Download" | Select-Object –ExpandProperty Node).PathRemote
-				LocalFilePath = $PSScriptRoot, (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']/Download" | Select-Object –ExpandProperty Node).PathLocal -join '\'
-				DLLPath  = $PSScriptRoot, (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP" | Select-Object –ExpandProperty Node).DLLPath -join '\'
+				HostName = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']" | Select-Object -ExpandProperty Node).Hostname
+				UserName = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']" | Select-Object -ExpandProperty Node).Username
+				Password = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']" | Select-Object -ExpandProperty Node).Password
+				SshHostKeyFingerprint = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']" | Select-Object -ExpandProperty Node).HostKeyFingerprint
+				RemoteFilePath = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']/Download" | Select-Object -ExpandProperty Node).PathRemote
+				LocalFilePath = $PSScriptRoot, (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']/Download" | Select-Object -ExpandProperty Node).PathLocal -join '\'
+				DLLPath  = $PSScriptRoot, (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP" | Select-Object -ExpandProperty Node).DLLPath -join '\'
 			}
 			$ConfigObj = New-Object -TypeName PSObject -Property $properties
 			Write-Output $ConfigObj
 		}
 		if ($PublishSynergyExport) {
 			$properties = @{
-				HostName = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']" | Select-Object –ExpandProperty Node).Hostname
-				UserName = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']" | Select-Object –ExpandProperty Node).Username
-				Password = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']" | Select-Object –ExpandProperty Node).Password
-				SshHostKeyFingerprint = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']" | Select-Object –ExpandProperty Node).HostKeyFingerprint
-				RemoteFilePath = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']/Upload" | Select-Object –ExpandProperty Node).PathRemote
-				LocalFilePath = $PSScriptRoot, (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']/Upload" | Select-Object –ExpandProperty Node).PathLocal -join '\'
-				DLLPath  = $PSScriptRoot, (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP" | Select-Object –ExpandProperty Node).DLLPath -join '\'
+				HostName = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']" | Select-Object -ExpandProperty Node).Hostname
+				UserName = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']" | Select-Object -ExpandProperty Node).Username
+				Password = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']" | Select-Object -ExpandProperty Node).Password
+				SshHostKeyFingerprint = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']" | Select-Object -ExpandProperty Node).HostKeyFingerprint
+				RemoteFilePath = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']/Upload" | Select-Object -ExpandProperty Node).PathRemote
+				LocalFilePath = $PSScriptRoot, (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']/Upload" | Select-Object -ExpandProperty Node).PathLocal -join '\'
+				DLLPath  = $PSScriptRoot, (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP" | Select-Object -ExpandProperty Node).DLLPath -join '\'
 			}
 			$ConfigObj = New-Object -TypeName PSObject -Property $properties
 			Write-Output $ConfigObj
 		}
 		if ($NewStudentUserGoogle) {
 			$properties = @{
-				EXEPath = $PSScriptRoot, (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/GAM" | Select-Object –ExpandProperty Node).EXEPath -join '\'
-				Oauth2Path = $PSScriptRoot, (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/GAM" | Select-Object –ExpandProperty Node).Oauth2Path -join '\'
+				EXEPath = $PSScriptRoot, (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/GAM" | Select-Object -ExpandProperty Node).EXEPath -join '\'
+				Oauth2Path = $PSScriptRoot, (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/GAM" | Select-Object -ExpandProperty Node).Oauth2Path -join '\'
 			}
 			$ConfigObj = New-Object -TypeName PSObject -Property $properties
 			Write-Output $ConfigObj
 		}
 		if ($ClearFile) {
 			$properties = @{
-				File = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/CleanupFiles" | Select-Object –ExpandProperty Node).File
+				File = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/CleanupFiles" | Select-Object -ExpandProperty Node).File
 			}
 			$ConfigObj = New-Object -TypeName PSObject -Property $properties
 			Write-Output $ConfigObj
 		}
 		if ($SuspendExpiredAccounts) {
 			$properties = @{
-				OrganizationalUnit = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location" | Select-Object –ExpandProperty Node).Path
+				OrganizationalUnit = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location" | Select-Object -ExpandProperty Node).Path
 			}
 			$ConfigObj = New-Object -TypeName PSObject -Property $properties
 			Write-Output $ConfigObj
 		}
 		if ($MoveSuspendedAccounts) {
 			$properties = @{
-				MoveFromOU = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location" | Select-Object –ExpandProperty Node).Path
-				MoveToOU   = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location[@Name=`'Disabled`']" | Select-Object –ExpandProperty Node).Path
+				MoveFromOU = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location" | Select-Object -ExpandProperty Node).Path
+				MoveToOU   = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location[@Name=`'Disabled`']" | Select-Object -ExpandProperty Node).Path
 			}
 			$ConfigObj = New-Object -TypeName PSObject -Property $properties
 			Write-Output $ConfigObj
 		}
 		if ($SendReport) {
 			$properties = @{
-				SMTPServer = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/Notifications" | Select-Object –ExpandProperty Node).SMTPServer
-				From	   = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/Notifications" | Select-Object –ExpandProperty Node).From
-				Body	   = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/Notifications" | Select-Object –ExpandProperty Node).Body
-				Subject    = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/Notifications" | Select-Object –ExpandProperty Node).Subject
+				SMTPServer = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/Notifications" | Select-Object -ExpandProperty Node).SMTPServer
+				From	   = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/Notifications" | Select-Object -ExpandProperty Node).From
+				Body	   = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/Notifications" | Select-Object -ExpandProperty Node).Body
+				Subject    = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/Notifications" | Select-Object -ExpandProperty Node).Subject
 			}
 			$ConfigObj = New-Object -TypeName PSObject -Property $properties
 			Write-Output $ConfigObj
 		}
 		if ($Notification) {
-			$ConfigObj = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/Notifications/Notification" | Select-Object –ExpandProperty Node)
+			$ConfigObj = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/Notifications/Notification" | Select-Object -ExpandProperty Node)
 			Write-Output $ConfigObj
 		}
 		if ($WriteSynergyExport) {
 			$properties = @{
-				OrganizationalUnit = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location" | Select-Object –ExpandProperty Node).Path
-				Path			   = $PSScriptRoot, (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']/Upload" | Select-Object –ExpandProperty Node).PathLocal -join '\'
-				LDAPAuth		   = ([System.Convert]::ToBoolean((Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/Features" | Select-Object –ExpandProperty Node).ExportSynergyLDAPAuth))
+				OrganizationalUnit = (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/UserConfig/Locations/Location" | Select-Object -ExpandProperty Node).Path
+				Path			   = $PSScriptRoot, (Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/WinSCP/Host[@Name=`'Synergy`']/Upload" | Select-Object -ExpandProperty Node).PathLocal -join '\'
+				LDAPAuth		   = ([System.Convert]::ToBoolean((Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/Features" | Select-Object -ExpandProperty Node).ExportSynergyLDAPAuth))
 			}
 			$ConfigObj = New-Object -TypeName PSObject -Property $properties
 			Write-Output $ConfigObj
 		}
 		if ($Features) {
 			$properties = @{
-				ExportSynergy = ([System.Convert]::ToBoolean((Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/Features" | Select-Object –ExpandProperty Node).ExportSynergy))
-				GoogleAccount = ([System.Convert]::ToBoolean((Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/Features" | Select-Object –ExpandProperty Node).GoogleAccount))
-				UserShare	  = ([System.Convert]::ToBoolean((Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/Features" | Select-Object –ExpandProperty Node).UserShare))
+				ExportSynergy = ([System.Convert]::ToBoolean((Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/Features" | Select-Object -ExpandProperty Node).ExportSynergy))
+				GoogleAccount = ([System.Convert]::ToBoolean((Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/Features" | Select-Object -ExpandProperty Node).GoogleAccount))
+				UserShare	  = ([System.Convert]::ToBoolean((Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/Features" | Select-Object -ExpandProperty Node).UserShare))
+				ADGroups	  = ([System.Convert]::ToBoolean((Select-Xml -Xml $ConfigXMLObj -XPath "/Districts/District[@Name='$District']/Features" | Select-Object -ExpandProperty Node).ADGroups))
 			}
 			$ConfigObj = New-Object -TypeName PSObject -Property $properties
 			Write-Output $ConfigObj
@@ -1256,7 +1360,6 @@ function Update-StudentUserAD {
 				}
 			}
 			NWRESD {
-				#if ($DataImport.Office -Like 'Levi*') { Set-ADAccountExpiration -Identity $DataAD.SamAccountName -DateTime ($DataImport.AccountExpirationDate).AddDays(- 30) } elseif (($DataImport.Title -eq '12') -or ($DataImport.Title -eq 'TR')) { Set-ADAccountExpiration -Identity $DataAD.SamAccountName -DateTime ($DataImport.AccountExpirationDate).AddDays(+ 365) } else { Set-ADAccountExpiration -Identity $DataAD.SamAccountName -DateTime $DataImport.AccountExpirationDate }
 				if (($DataImport.Title -eq '12') -or ($DataImport.Title -eq 'TR')) { Set-ADAccountExpiration -Identity $DataAD.SamAccountName -DateTime ($DataImport.AccountExpirationDate).AddDays(+ 365) } else { Set-ADAccountExpiration -Identity $DataAD.SamAccountName -DateTime $DataImport.AccountExpirationDate }
 				Set-ADUser -Identity $DataAD.SamAccountName -Title $DataImport.Title -Description $DataImport.Description -Department $DataImport.Department -Office $DataImport.Office
 				if (($DataImport.Initials) -and ($DataAD.Initials -ne $DataImport.Initials)) { Set-ADUser -Identity $DataAD.SamAccountName -Initials $DataImport.Initials }
@@ -1267,7 +1370,6 @@ function Update-StudentUserAD {
 					Set-ADUser -Identity $DataAD.SamAccountName -Clear personalTitle
 					Set-ADUser -Identity $DataAD.SamAccountName -Add @{ 'personalTitle' = "$($DataImport.personalTitle)" }
 				}
-				#if ($DataAD.DisplayName -ne $DataImport.DisplayName) { Set-ADUser -Identity $DataAD.SamAccountName -DisplayName $DataImport.DisplayName }
 				if ($userDataAD.Enabled -eq $false) {
 					$notify = $true
 					try {
@@ -1487,14 +1589,14 @@ function Write-SynergyExportFile {
 			}
 			default {
 				if ($LDAPAuth) {
-					foreach ($DN in $OrganizationalUnit | Sort-Object | Get-Unique ) {
+					foreach ($DN in $OrganizationalUnit | Sort-Object | Get-Unique) {
 						$users += Get-ADUser -SearchBase $DN -Filter { (Enabled -eq $true) } -Properties mail, employeeID, SamAccountName
 					}
 					$users | Where-Object { ($_.EmployeeID -match "^[\d\.]+$") -and ($_.Mail -ne $null) } | Select-Object employeeid, mail, SamAccountName | export-csv -delimiter "`t" -notypeinformation -append -path $Path
 					(Get-Content $Path) | ForEach-Object { $_ -replace '"', '' } | out-file -FilePath $Path -Force -Encoding ascii
 					(Get-Content $Path) | Select-Object -SkipLast 1 | Set-Content $Path
 				} else {
-					foreach ($DN in $OrganizationalUnit | Sort-Object | Get-Unique ) {
+					foreach ($DN in $OrganizationalUnit | Sort-Object | Get-Unique) {
 						$users += Get-ADUser -SearchBase $DN -Filter { (Enabled -eq $true) } -Properties mail, employeeID, assistant
 					}
 					$users | Where-Object { ($_.EmployeeID -match "^[\d\.]+$") -and ($_.Mail -ne $null) } | Select-Object employeeid, mail, assistant | export-csv -delimiter "`t" -notypeinformation -append -path $Path
@@ -1519,8 +1621,9 @@ try {
 	Read-ConfigXML -District $District -Path $ConfigXML -GetSynergyImport | Get-FileSCP
 	$ConfigScript = Read-ConfigXML -District $District -Path $ConfigXML -Script
 	$ConfigF = Read-ConfigXML -District $District -Path $ConfigXML -Features
+	if ($ConfigF.ADGroups) { $ConfigUGA = Read-ConfigXML -District $District -Path $ConfigXML -UpdateGroupAD }
 	$userdata = Import-Csv -Path $ConfigScript.ImportCSVPath | Sort-Object -Property SIS_NUMBER
-	#endregion Begin
+	#endregion Begin	
 	#region Process
 	foreach ($row in $userdata) {
 		$rowStopWatch = [system.diagnostics.stopwatch]::StartNew()
@@ -1560,12 +1663,14 @@ try {
 			New-StudentUserAD -Student $userDataImport
 			if ($ConfigF.GoogleAccount) { Read-ConfigXML -District $District -Path $ConfigXML -NewStudentUserGoogle | New-StudentUserGoogle -EmailAddress $userDataImport.EmailAddress -FirstName $userDataImport.GivenName -LastName $userDataImport.Surname -Password $userDataImport.Password }
 			if (($ConfigF.UserShare) -and ($ConfigNUS.HomeDirectoryServer)) { $ConfigNUS | New-UserShare -SAMAccountName $userDataImport.SamAccountName -District $District | ForEach-Object { $userDataImport.HomeDirectory = $_.HomeDirectory; Set-ADUser -Identity $userDataImport.SamAccountName -HomeDirectory $_.HomeDirectory; Set-ADUser -Identity $userDataImport.SamAccountName -HomeDrive $userDataImport.HomeDrive } }
-		} else {
+			if ($ConfigF.ADGroups) { Update-GroupAD -GroupsOU $ConfigUGA.ADGroupOU -sAMAccountName $userDataImport.SamAccountName -Grade $userDataImport.Title -GradYear $userDataImport.personalTitle.Substring(2) -HomeroomTeacher $userDataImport.Division -Location $userDataImport.Office }
+			} else {
 			Write-Verbose "Update Existing User $($row.SIS_NUMBER)"
 			Write-LogEntry -Severity 1 -Value "Update Existing User $($row.SIS_NUMBER)"
 			$userDataImport.HomeDirectory = '\\', $ConfigNUS.HomeDirectoryServer, '\', $userDataAD.SamAccountName, '$' -join ''
 			$userDataImport.Path = (Get-OrganizationalUnitPath -Location $userDataImport.Office -GradYear $userDataImport.personalTitle.Substring(2) -Grade $userDataImport.Title -OrganizationalUnit $userDataImport.Path -District $District).Path
-			New-SamAccountName -GivenName $userDataAD.GivenName -SurName $userDataAD.Surname -GradYear $userDataImport.personalTitle.Substring(2) -UPNSuffiix $ConfigScript.UPNSuffix -Grade $userDataImport.Title -AllUsersAD $currentUsers -District $District | Foreach-Object { $userDataImport.Name = $_.Name; $userDataImport.UserPrincipalName = $_.UserPrincipalName; $userDataImport.SamAccountName = $_.SamAccountName }
+			New-SamAccountName -GivenName $userDataAD.GivenName -SurName $userDataAD.Surname -GradYear $userDataImport.personalTitle.Substring(2) -UPNSuffiix $ConfigScript.UPNSuffix -Grade $userDataImport.Title -CurrerntSamAccountName $userDataAD.SamAccountName -AllUsersAD $currentUsers -District $District | Foreach-Object { $userDataImport.Name = $_.Name; $userDataImport.UserPrincipalName = $_.UserPrincipalName; $userDataImport.SamAccountName = $_.SamAccountName }
+			if ($ConfigF.ADGroups) { Update-GroupAD -GroupsOU $ConfigUGA.ADGroupOU -sAMAccountName $userDataAD.sAMAccountName -Grade $userDataImport.Title -GradYear $userDataImport.personalTitle.Substring(2) -HomeroomTeacher $userDataImport.Division -Location $userDataImport.Office}
 			$userDataImport.Notify = (Update-StudentUserAD -DataAD $userDataAD -DataImport $userDataImport -District $District).Notify
 		}
 		if ($userDataImport.Notify -eq $true) {
@@ -1579,7 +1684,7 @@ try {
 		Write-LogEntry -Severity 1 -Value "End $($row.SIS_NUMBER)"
 	}
 	#endregion Process
-	#region End
+
 	if ($output) {
 		$Notification = (Read-ConfigXML -District $District -Path $ConfigXML -Notification)
 		foreach ($location in $Notification.Name) {
@@ -1593,8 +1698,7 @@ try {
 	
 	if ($ConfigF.ExportSynergy) {
 		Read-ConfigXML -District $District -Path $ConfigXML -WriteSynergyExport | Write-SynergyExportFile -District $District
-		Read-ConfigXML -District $District -Path $ConfigXML -PublishSynergyExport | Publish-FileSCP
-		
+		Read-ConfigXML -District $District -Path $ConfigXML -PublishSynergyExport | Send-FileSCP
 	}
 } finally {
 	Pop-Location
@@ -1606,164 +1710,94 @@ try {
 
 
 # SIG # Begin signature block
-# MIId7QYJKoZIhvcNAQcCoIId3jCCHdoCAQExDzANBglghkgBZQMEAgEFADB5Bgor
+# MIIQuAYJKoZIhvcNAQcCoIIQqTCCEKUCAQExDzANBglghkgBZQMEAgEFADB5Bgor
 # BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG
-# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCBvifFACy/8XJ9D
-# 5I4g/noAVvZAGT8Z6ce23q/lqAktIKCCGK8wggPQMIICuKADAgECAhBWDzlgMpdv
-# skWlu9PmVks2MA0GCSqGSIb3DQEBCwUAMFoxEzARBgoJkiaJk/IsZAEZFgNvcmcx
-# GzAZBgoJkiaJk/IsZAEZFgtjYXNjYWRldGVjaDEVMBMGCgmSJomT8ixkARkWBWlu
-# dHJhMQ8wDQYDVQQDEwZDVEEtQ0EwHhcNMTUwODE4MjIwMDI3WhcNMzUwODE4MjIy
-# MDMwWjBaMRMwEQYKCZImiZPyLGQBGRYDb3JnMRswGQYKCZImiZPyLGQBGRYLY2Fz
-# Y2FkZXRlY2gxFTATBgoJkiaJk/IsZAEZFgVpbnRyYTEPMA0GA1UEAxMGQ1RBLUNB
-# MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAnwUnO1/doXUEwlU3eS8B
-# koKLxPCNr54RnKXIS9abNqrUn+EzeDpOxsmjomYaErLsQGrSeO/k93kCLtBVhTx2
-# OaeSt3klYk88PVS2jHmTkowwvkxl/Nk/L7941lgeBE5YNmugSjGjvcVRvzC5Hd2n
-# GaNj1SLWwDw3rwDmifBY0rcs140RE7T3Ms4pquIejfzk4CYf9M3cEKEVLDwgnN7L
-# yJVVd1Wj4M472nwdU9XHjMqLTAds0258iGqFooWa8cdNRGP1F57bLn4wSK9wJXfb
-# ydpgnXWkFsjb8uEiagjxBkXaR6M9uldrGaDN0o0XpP4xMBLeQcNMuhEH0EB4Joto
-# cwIDAQABo4GRMIGOMBMGCSsGAQQBgjcUAgQGHgQAQwBBMA4GA1UdDwEB/wQEAwIB
-# hjAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBRFtRVw0jTNG1WszSXHh+qWu8Il
-# nzASBgkrBgEEAYI3FQEEBQIDAgADMCMGCSsGAQQBgjcVAgQWBBSnN6gbSu96Heb+
-# 2FbsX4B6hpdPijANBgkqhkiG9w0BAQsFAAOCAQEAC4FQJ3s5HFFiLD1z8XV63o6J
-# wx0NWWDeOwcw7EbXmp72bm0QQLoFGpQsM5GTLdiu+HtGxrtUj6uQNKWgpWUp+Koy
-# PEy9JoCEencFaPIyrG9iYTc1UXgwz719RVZ0h1/QloSGFXzgNxGNXkLGw1FsBmzg
-# +DnwSUEKHt7yICi7LOKHju6qauhHg9T2sNNShB0yZaoMvRekXPXMWw4k+ccDdgcW
-# MOF9VkdAvBFXx5BVoE6GuUZRYRVcQMH2rc0eGddfvZ3ZpVmK4DdBssNU47CmNix2
-# mCaDzLc6mGuzMtKYnkzsh3+G2hj3kOQ+2x0D9eoBzyPhE+rmFw2eIDTCML2N+TCC
-# BBQwggL8oAMCAQICCwQAAAAAAS9O4VLXMA0GCSqGSIb3DQEBBQUAMFcxCzAJBgNV
-# BAYTAkJFMRkwFwYDVQQKExBHbG9iYWxTaWduIG52LXNhMRAwDgYDVQQLEwdSb290
-# IENBMRswGQYDVQQDExJHbG9iYWxTaWduIFJvb3QgQ0EwHhcNMTEwNDEzMTAwMDAw
-# WhcNMjgwMTI4MTIwMDAwWjBSMQswCQYDVQQGEwJCRTEZMBcGA1UEChMQR2xvYmFs
-# U2lnbiBudi1zYTEoMCYGA1UEAxMfR2xvYmFsU2lnbiBUaW1lc3RhbXBpbmcgQ0Eg
-# LSBHMjCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAJTvZfi1V5+gUw00
-# BusJH7dHGGrL8Fvk/yelNNH3iRq/nrHNEkFuZtSBoIWLZFpGL5mgjXex4rxc3SLX
-# amfQu+jKdN6LTw2wUuWQW+tHDvHnn5wLkGU+F5YwRXJtOaEXNsq5oIwbTwgZ9oEx
-# rWEWpGLmtECew/z7lfb7tS6VgZjg78Xr2AJZeHf3quNSa1CRKcX8982TZdJgYSLy
-# Bvsy3RZR+g79ijDwFwmnu/MErquQ52zfeqn078RiJ19vmW04dKoRi9rfxxRM6YWy
-# 7MJ9SiaP51a6puDPklOAdPQD7GiyYLyEIACDG6HutHQFwSmOYtBHsfrwU8wY+S47
-# +XB+tCUCAwEAAaOB5TCB4jAOBgNVHQ8BAf8EBAMCAQYwEgYDVR0TAQH/BAgwBgEB
-# /wIBADAdBgNVHQ4EFgQURtg+/9zjvv+D5vSFm7DdatYUqcEwRwYDVR0gBEAwPjA8
-# BgRVHSAAMDQwMgYIKwYBBQUHAgEWJmh0dHBzOi8vd3d3Lmdsb2JhbHNpZ24uY29t
-# L3JlcG9zaXRvcnkvMDMGA1UdHwQsMCowKKAmoCSGImh0dHA6Ly9jcmwuZ2xvYmFs
-# c2lnbi5uZXQvcm9vdC5jcmwwHwYDVR0jBBgwFoAUYHtmGkUNl8qJUC99BM00qP/8
-# /UswDQYJKoZIhvcNAQEFBQADggEBAE5eVpAeRrTZSTHzuxc5KBvCFt39QdwJBQSb
-# b7KimtaZLkCZAFW16j+lIHbThjTUF8xVOseC7u+ourzYBp8VUN/NFntSOgLXGRr9
-# r/B4XOBLxRjfOiQe2qy4qVgEAgcw27ASXv4xvvAESPTwcPg6XlaDzz37Dbz0xe2X
-# nbnU26UnhOM4m4unNYZEIKQ7baRqC6GD/Sjr2u8o9syIXfsKOwCr4CHr4i81bA+O
-# NEWX66L3mTM1fsuairtFTec/n8LZivplsm7HfmX/6JLhLDGi97AnNkiPJm877k12
-# H3nD5X+WNbwtDswBsI5//1GAgKeS1LNERmSMh08WYwcxS2Ow3/MwggSfMIIDh6AD
-# AgECAhIRIdaZp2SXPvH4Qn7pGcxTQRQwDQYJKoZIhvcNAQEFBQAwUjELMAkGA1UE
+# KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCBRVglIILSsCFdI
+# DxMMVqJiwhWAtP628ca5icyRbmOEeqCCC8UwggMGMIIB7qADAgECAhAvm0sjSQH3
+# m0LSdEnNXu4qMA0GCSqGSIb3DQEBBQUAMBYxFDASBgNVBAMMC0VkZW4gTmVsc29u
+# MB4XDTE3MDkwODIyMjY1MVoXDTM3MDkwODIyMzY1MVowFjEUMBIGA1UEAwwLRWRl
+# biBOZWxzb24wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC3lMKGVj2k
+# Rlf/d9ZWmJoqLDG+hqkThaS+TF8uiPwsnFkIEkjjJaMoLIV+5mk1OQvZxHajtLgi
+# SnVXEkCUdrSagfbsDgJ3pYPEA8WSx/IQ1j5oWl9lIwIuqXyRCD1vMwPHJb7kuviv
+# a05fczHTcd4Iuj2XdrHcacUntSsUQxEW+JpkzEOUVPhxSYdB8vZZoW+I/pt9FPf6
+# MuzcolbK4RWCuyCDh9kASJOj+e4LZF19PTSCypVPOuDUXI92cTjcxNyiMcSJEnXg
+# ZFEURT8Jfw+e0Yq9R/6oCWnYZgMGD9iYEQku0XG8KjVWNrugO5sqdw89ZQqYDzlZ
+# e0NSwcTliiGRAgMBAAGjUDBOMA4GA1UdDwEB/wQEAwIFoDAdBgNVHSUEFjAUBggr
+# BgEFBQcDAgYIKwYBBQUHAwEwHQYDVR0OBBYEFBCaND0z/gTu/Cbsm3UxQIbh/je7
+# MA0GCSqGSIb3DQEBBQUAA4IBAQAIeQRrB23zdZpDymoDE52GN2v9N5Uu3cgkUz9k
+# 788n3LfuQnhBdDSGXi2ZhUX2kXyas/F0tE0uEYxWb6NDwA8qYBSl7AWL+hEA2mkb
+# a7Dj3p6KRyKkHsiPAY0BSu7hZypZ8oC19Y2uXYcUQymfJ4jg2sZkpfEL4JM5XXTZ
+# KpWrY7bGIqu8VJH40j3EJg1dcG0SsTDtyoYxoc921zRMztygYe9tLya6gl0zy1Qt
+# rKOLu+Q8pHsP8dcSest7QNL8xEYdE92qAa7LPwzwhVSU168LoYRiu64FD8P80ZOH
+# ARN5U3JqQjDqsx5FJeY9XdFDXtKTU55pQvPID9Wjn6D2MLo3MIIEFDCCAvygAwIB
+# AgILBAAAAAABL07hUtcwDQYJKoZIhvcNAQEFBQAwVzELMAkGA1UEBhMCQkUxGTAX
+# BgNVBAoTEEdsb2JhbFNpZ24gbnYtc2ExEDAOBgNVBAsTB1Jvb3QgQ0ExGzAZBgNV
+# BAMTEkdsb2JhbFNpZ24gUm9vdCBDQTAeFw0xMTA0MTMxMDAwMDBaFw0yODAxMjgx
+# MjAwMDBaMFIxCzAJBgNVBAYTAkJFMRkwFwYDVQQKExBHbG9iYWxTaWduIG52LXNh
+# MSgwJgYDVQQDEx9HbG9iYWxTaWduIFRpbWVzdGFtcGluZyBDQSAtIEcyMIIBIjAN
+# BgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAlO9l+LVXn6BTDTQG6wkft0cYasvw
+# W+T/J6U00feJGr+esc0SQW5m1IGghYtkWkYvmaCNd7HivFzdItdqZ9C76Mp03otP
+# DbBS5ZBb60cO8eefnAuQZT4XljBFcm05oRc2yrmgjBtPCBn2gTGtYRakYua0QJ7D
+# /PuV9vu1LpWBmODvxevYAll4d/eq41JrUJEpxfz3zZNl0mBhIvIG+zLdFlH6Dv2K
+# MPAXCae78wSuq5DnbN96qfTvxGInX2+ZbTh0qhGL2t/HFEzphbLswn1KJo/nVrqm
+# 4M+SU4B09APsaLJgvIQgAIMboe60dAXBKY5i0Eex+vBTzBj5Ljv5cH60JQIDAQAB
+# o4HlMIHiMA4GA1UdDwEB/wQEAwIBBjASBgNVHRMBAf8ECDAGAQH/AgEAMB0GA1Ud
+# DgQWBBRG2D7/3OO+/4Pm9IWbsN1q1hSpwTBHBgNVHSAEQDA+MDwGBFUdIAAwNDAy
+# BggrBgEFBQcCARYmaHR0cHM6Ly93d3cuZ2xvYmFsc2lnbi5jb20vcmVwb3NpdG9y
+# eS8wMwYDVR0fBCwwKjAooCagJIYiaHR0cDovL2NybC5nbG9iYWxzaWduLm5ldC9y
+# b290LmNybDAfBgNVHSMEGDAWgBRge2YaRQ2XyolQL30EzTSo//z9SzANBgkqhkiG
+# 9w0BAQUFAAOCAQEATl5WkB5GtNlJMfO7FzkoG8IW3f1B3AkFBJtvsqKa1pkuQJkA
+# VbXqP6UgdtOGNNQXzFU6x4Lu76i6vNgGnxVQ380We1I6AtcZGv2v8Hhc4EvFGN86
+# JB7arLipWAQCBzDbsBJe/jG+8ARI9PBw+DpeVoPPPfsNvPTF7ZedudTbpSeE4zib
+# i6c1hkQgpDttpGoLoYP9KOva7yj2zIhd+wo7AKvgIeviLzVsD440RZfroveZMzV+
+# y5qKu0VN5z+fwtmK+mWybsd+Zf/okuEsMaL3sCc2SI8mbzvuTXYfecPlf5Y1vC0O
+# zAGwjn//UYCAp5LUs0RGZIyHTxZjBzFLY7Df8zCCBJ8wggOHoAMCAQICEhEh1pmn
+# ZJc+8fhCfukZzFNBFDANBgkqhkiG9w0BAQUFADBSMQswCQYDVQQGEwJCRTEZMBcG
+# A1UEChMQR2xvYmFsU2lnbiBudi1zYTEoMCYGA1UEAxMfR2xvYmFsU2lnbiBUaW1l
+# c3RhbXBpbmcgQ0EgLSBHMjAeFw0xNjA1MjQwMDAwMDBaFw0yNzA2MjQwMDAwMDBa
+# MGAxCzAJBgNVBAYTAlNHMR8wHQYDVQQKExZHTU8gR2xvYmFsU2lnbiBQdGUgTHRk
+# MTAwLgYDVQQDEydHbG9iYWxTaWduIFRTQSBmb3IgTVMgQXV0aGVudGljb2RlIC0g
+# RzIwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCwF66i07YEMFYeWA+x
+# 7VWk1lTL2PZzOuxdXqsl/Tal+oTDYUDFRrVZUjtCoi5fE2IQqVvmc9aSJbF9I+MG
+# s4c6DkPw1wCJU6IRMVIobl1AcjzyCXenSZKX1GyQoHan/bjcs53yB2AsT1iYAGvT
+# FVTg+t3/gCxfGKaY/9Sr7KFFWbIub2Jd4NkZrItXnKgmK9kXpRDSRwgacCwzi39o
+# gCq1oV1r3Y0CAikDqnw3u7spTj1Tk7Om+o/SWJMVTLktq4CjoyX7r/cIZLB6RA9c
+# ENdfYTeqTmvT0lMlnYJz+iz5crCpGTkqUPqp0Dw6yuhb7/VfUfT5CtmXNd5qheYj
+# BEKvAgMBAAGjggFfMIIBWzAOBgNVHQ8BAf8EBAMCB4AwTAYDVR0gBEUwQzBBBgkr
+# BgEEAaAyAR4wNDAyBggrBgEFBQcCARYmaHR0cHM6Ly93d3cuZ2xvYmFsc2lnbi5j
+# b20vcmVwb3NpdG9yeS8wCQYDVR0TBAIwADAWBgNVHSUBAf8EDDAKBggrBgEFBQcD
+# CDBCBgNVHR8EOzA5MDegNaAzhjFodHRwOi8vY3JsLmdsb2JhbHNpZ24uY29tL2dz
+# L2dzdGltZXN0YW1waW5nZzIuY3JsMFQGCCsGAQUFBwEBBEgwRjBEBggrBgEFBQcw
+# AoY4aHR0cDovL3NlY3VyZS5nbG9iYWxzaWduLmNvbS9jYWNlcnQvZ3N0aW1lc3Rh
+# bXBpbmdnMi5jcnQwHQYDVR0OBBYEFNSihEo4Whh/uk8wUL2d1XqH1gn3MB8GA1Ud
+# IwQYMBaAFEbYPv/c477/g+b0hZuw3WrWFKnBMA0GCSqGSIb3DQEBBQUAA4IBAQCP
+# qRqRbQSmNyAOg5beI9Nrbh9u3WQ9aCEitfhHNmmO4aVFxySiIrcpCcxUWq7GvM1j
+# jrM9UEjltMyuzZKNniiLE0oRqr2j79OyNvy0oXK/bZdjeYxEvHAvfvO83YJTqxr2
+# 6/ocl7y2N5ykHDC8q7wtRzbfkiAD6HHGWPZ1BZo08AtZWoJENKqA5C+E9kddlsm2
+# ysqdt6a65FDT1De4uiAO0NOSKlvEWbuhbds8zkSdwTgqreONvc0JdxoQvmcKAjZk
+# iLmzGybu555gxEaovGEzbM9OuZy5avCfN/61PU+a003/3iCOTpem/Z8JvE3KGHbJ
+# sE2FUPKA0h0G9VgEB7EYMYIESTCCBEUCAQEwKjAWMRQwEgYDVQQDDAtFZGVuIE5l
+# bHNvbgIQL5tLI0kB95tC0nRJzV7uKjANBglghkgBZQMEAgEFAKBMMBkGCSqGSIb3
+# DQEJAzEMBgorBgEEAYI3AgEEMC8GCSqGSIb3DQEJBDEiBCCJ9IKdryGooS/x9Dmj
+# YvGUnHjDQ8qog3Ww5iqODRc4FTANBgkqhkiG9w0BAQEFAASCAQBLVwhcsZjOBWig
+# X7FLa3pISaBkWk9Za4y6OTicpvTT0yOx+/ciLpM6tQXr9cFM32m7YB5obPNd+Cr7
+# SCnxb22BebtoSU81yPdekJjmg5lCYBRhTadZrfp8m+fNG/o8OOUoKawkzpjnp3o5
+# ZXuIkaKE8NscSGCvCEccbxpLxsNBVhJ9z8Dd06SibgQWpIyEr9vhqp1O3A8Lv+qZ
+# 5e36CtZp/Mup3OLm3DYSLwk0xudjzHPqqiXlT4t7ewkfVobY3yTS7Vi+Gk76peHb
+# q9dqstNYsYaZm+qR3w8XMccvtLDCnR9l8cP+uhE3xCIks8EAr89khjuobi1+rx1V
+# sPgoCqnPoYICojCCAp4GCSqGSIb3DQEJBjGCAo8wggKLAgEBMGgwUjELMAkGA1UE
 # BhMCQkUxGTAXBgNVBAoTEEdsb2JhbFNpZ24gbnYtc2ExKDAmBgNVBAMTH0dsb2Jh
-# bFNpZ24gVGltZXN0YW1waW5nIENBIC0gRzIwHhcNMTYwNTI0MDAwMDAwWhcNMjcw
-# NjI0MDAwMDAwWjBgMQswCQYDVQQGEwJTRzEfMB0GA1UEChMWR01PIEdsb2JhbFNp
-# Z24gUHRlIEx0ZDEwMC4GA1UEAxMnR2xvYmFsU2lnbiBUU0EgZm9yIE1TIEF1dGhl
-# bnRpY29kZSAtIEcyMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsBeu
-# otO2BDBWHlgPse1VpNZUy9j2czrsXV6rJf02pfqEw2FAxUa1WVI7QqIuXxNiEKlb
-# 5nPWkiWxfSPjBrOHOg5D8NcAiVOiETFSKG5dQHI88gl3p0mSl9RskKB2p/243LOd
-# 8gdgLE9YmABr0xVU4Prd/4AsXximmP/Uq+yhRVmyLm9iXeDZGayLV5yoJivZF6UQ
-# 0kcIGnAsM4t/aIAqtaFda92NAgIpA6p8N7u7KU49U5OzpvqP0liTFUy5LauAo6Ml
-# +6/3CGSwekQPXBDXX2E3qk5r09JTJZ2Cc/os+XKwqRk5KlD6qdA8OsroW+/1X1H0
-# +QrZlzXeaoXmIwRCrwIDAQABo4IBXzCCAVswDgYDVR0PAQH/BAQDAgeAMEwGA1Ud
-# IARFMEMwQQYJKwYBBAGgMgEeMDQwMgYIKwYBBQUHAgEWJmh0dHBzOi8vd3d3Lmds
-# b2JhbHNpZ24uY29tL3JlcG9zaXRvcnkvMAkGA1UdEwQCMAAwFgYDVR0lAQH/BAww
-# CgYIKwYBBQUHAwgwQgYDVR0fBDswOTA3oDWgM4YxaHR0cDovL2NybC5nbG9iYWxz
-# aWduLmNvbS9ncy9nc3RpbWVzdGFtcGluZ2cyLmNybDBUBggrBgEFBQcBAQRIMEYw
-# RAYIKwYBBQUHMAKGOGh0dHA6Ly9zZWN1cmUuZ2xvYmFsc2lnbi5jb20vY2FjZXJ0
-# L2dzdGltZXN0YW1waW5nZzIuY3J0MB0GA1UdDgQWBBTUooRKOFoYf7pPMFC9ndV6
-# h9YJ9zAfBgNVHSMEGDAWgBRG2D7/3OO+/4Pm9IWbsN1q1hSpwTANBgkqhkiG9w0B
-# AQUFAAOCAQEAj6kakW0EpjcgDoOW3iPTa24fbt1kPWghIrX4RzZpjuGlRcckoiK3
-# KQnMVFquxrzNY46zPVBI5bTMrs2SjZ4oixNKEaq9o+/Tsjb8tKFyv22XY3mMRLxw
-# L37zvN2CU6sa9uv6HJe8tjecpBwwvKu8LUc235IgA+hxxlj2dQWaNPALWVqCRDSq
-# gOQvhPZHXZbJtsrKnbemuuRQ09Q3uLogDtDTkipbxFm7oW3bPM5EncE4Kq3jjb3N
-# CXcaEL5nCgI2ZIi5sxsm7ueeYMRGqLxhM2zPTrmcuWrwnzf+tT1PmtNN/94gjk6X
-# pv2fCbxNyhh2ybBNhVDygNIdBvVYBAexGDCCBbYwggSeoAMCAQICE10AAAJ8Xj/h
-# LaszG+AAAwAAAnwwDQYJKoZIhvcNAQELBQAwWjETMBEGCgmSJomT8ixkARkWA29y
-# ZzEbMBkGCgmSJomT8ixkARkWC2Nhc2NhZGV0ZWNoMRUwEwYKCZImiZPyLGQBGRYF
-# aW50cmExDzANBgNVBAMTBkNUQS1DQTAeFw0xNzA5MjcyMTM4MDRaFw0yMjA5MjYy
-# MTM4MDRaMF4xEzARBgoJkiaJk/IsZAEZFgNvcmcxGzAZBgoJkiaJk/IsZAEZFgtj
-# YXNjYWRldGVjaDEVMBMGCgmSJomT8ixkARkWBWludHJhMRMwEQYDVQQDEwpDVEEt
-# SU5ULUNBMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAylW9Cd94uZun
-# nWpoNn4UNKhhdiPZr1mHroZQoscxW8Tp4p98UMNu3uACWz+VkNfWMvZqytuaAUVb
-# zEP8q1JVDZ5huNlC7aDrRL+76j2S47UIOYzdMDu9k/USeY/bDASfTWmX+0u4aGxM
-# +QuYqx0RbSCSgr8AXr0VDJ3p2Lr+9HcmAGzR6Zt7afUjZbcS0tbdOhL2tySVQI5C
-# FjOchncp8QrJI6tk8Wdg5fegqYALvIWfVrVxeNMpz747NI0b5P/JOXktMuKS7nBa
-# 87yQIL7p/eQfKE0FWEISHGbeOyVEyUUxBlgTQ6W0HocVyzjJDguOOzOSIVcGB+Hr
-# X8V4uELXMwIDAQABo4ICbzCCAmswEAYJKwYBBAGCNxUBBAMCAQAwHQYDVR0OBBYE
-# FGa92DKMwOeyGR6PViTrCjEGqCF8MBkGCSsGAQQBgjcUAgQMHgoAUwB1AGIAQwBB
-# MA4GA1UdDwEB/wQEAwIBhjAPBgNVHRMBAf8EBTADAQH/MB8GA1UdIwQYMBaAFEW1
-# FXDSNM0bVazNJceH6pa7wiWfMIIBEQYDVR0fBIIBCDCCAQQwggEAoIH9oIH6hoG/
-# bGRhcDovLy9DTj1DVEEtQ0EoMiksQ049Q1RBLUNBLTAxLENOPUNEUCxDTj1QdWJs
-# aWMlMjBLZXklMjBTZXJ2aWNlcyxDTj1TZXJ2aWNlcyxDTj1Db25maWd1cmF0aW9u
-# LERDPWludHJhLERDPWNhc2NhZGV0ZWNoLERDPW9yZz9jZXJ0aWZpY2F0ZVJldm9j
-# YXRpb25MaXN0P2Jhc2U/b2JqZWN0Q2xhc3M9Y1JMRGlzdHJpYnV0aW9uUG9pbnSG
-# Nmh0dHA6Ly9jdGFjcmwuY2FzY2FkZXRlY2gub3JnL0NlcnRFbnJvbGwvQ1RBLUNB
-# KDIpLmNybDCBxQYIKwYBBQUHAQEEgbgwgbUwgbIGCCsGAQUFBzAChoGlbGRhcDov
-# Ly9DTj1DVEEtQ0EsQ049QUlBLENOPVB1YmxpYyUyMEtleSUyMFNlcnZpY2VzLENO
-# PVNlcnZpY2VzLENOPUNvbmZpZ3VyYXRpb24sREM9aW50cmEsREM9Y2FzY2FkZXRl
-# Y2gsREM9b3JnP2NBQ2VydGlmaWNhdGU/YmFzZT9vYmplY3RDbGFzcz1jZXJ0aWZp
-# Y2F0aW9uQXV0aG9yaXR5MA0GCSqGSIb3DQEBCwUAA4IBAQAlyqwL7Qoxf9jmAb3W
-# 03Jiga2XKzz8Lzi4gy4N/DFHOfgYEiTb+hD245PxV9VXuWUpeMa28f7yCHHJ32CI
-# 5881ab/r1/gwXQlxqg0Nof74P+hv7AdJ3eQjo92mEyUt64ElA7S/n3LGDAiJIDTq
-# O/gUOj1n3NTOMGdAeKSId9WcgeTxh5j+X/aNnbpRy58s2rt46KDv4jQrXWLZqHp9
-# dzIyCNtfnqotXA2jePXDWYbD8Zw8dsCBwQw+2C/ktXS8Z/GrLLDJB82CtPzmeTKN
-# pclDXz1vttVeASkVc7w668OUsGgyRojKvRonLlcr00nRgcO8SOtsgsJcbQSiIvKF
-# 70afMIIGYjCCBUqgAwIBAgITTQAACNTm6lyP5isnXwAAAAAI1DANBgkqhkiG9w0B
-# AQsFADBeMRMwEQYKCZImiZPyLGQBGRYDb3JnMRswGQYKCZImiZPyLGQBGRYLY2Fz
-# Y2FkZXRlY2gxFTATBgoJkiaJk/IsZAEZFgVpbnRyYTETMBEGA1UEAxMKQ1RBLUlO
-# VC1DQTAeFw0xODAxMjEyMjE5MjJaFw0xOTAxMjEyMjE5MjJaMIGaMRMwEQYKCZIm
-# iZPyLGQBGRYDb3JnMRswGQYKCZImiZPyLGQBGRYLY2FzY2FkZXRlY2gxFTATBgoJ
-# kiaJk/IsZAEZFgVpbnRyYTENMAsGA1UECxMETUVTRDEUMBIGA1UEAxMLRWRlbiBO
-# ZWxzb24xKjAoBgkqhkiG9w0BCQEWG2VkZW4ubmVsc29uQGNhc2NhZGV0ZWNoLm9y
-# ZzCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBALkQFRlY5uvISFbe6fUG
-# i3nj805Vwr/LahJVsURbNK+Kd7Pu7Mh9x9CAhiq2tEjfVzaMh6tG4ByYM/DGchHw
-# Pqoco1kqak9Wh7KdVdoNROozbcfe9PFrYLCMbbi1x/LBRaQwh26o4jt3AGHpNnqn
-# DuN1DwlKQAI67TyiGa9zq4Rqxv+1txLaR/spVpcWRJwBwRx7I4UlucuVObBnGGia
-# 0ysfn3iMy1r3C17b8T84tSjS2q3uNuWV3ZnpvpzYaMI0MK7cQt3/OpjZlHWxx8ju
-# zCeN3xVjQnAA0HX98IUI+MIhjun8sJq482VDN+7M7N7iISXV7xyJVEX8FjSKeAUg
-# kWECAwEAAaOCAtowggLWMBcGCSsGAQQBgjcUAgQKHggAVQBzAGUAcjApBgNVHSUE
-# IjAgBgorBgEEAYI3CgMEBggrBgEFBQcDBAYIKwYBBQUHAwIwDgYDVR0PAQH/BAQD
-# AgWgMEQGCSqGSIb3DQEJDwQ3MDUwDgYIKoZIhvcNAwICAgCAMA4GCCqGSIb3DQME
-# AgIAgDAHBgUrDgMCBzAKBggqhkiG9w0DBzAdBgNVHQ4EFgQU20Y/FbHR+bpIsRwi
-# JxRcmuFP99EwHwYDVR0jBBgwFoAUZr3YMozA57IZHo9WJOsKMQaoIXwwgdcGA1Ud
-# HwSBzzCBzDCByaCBxqCBw4aBwGxkYXA6Ly8vQ049Q1RBLUlOVC1DQSxDTj1DVEEt
-# Q0EtMDIsQ049Q0RQLENOPVB1YmxpYyUyMEtleSUyMFNlcnZpY2VzLENOPVNlcnZp
-# Y2VzLENOPUNvbmZpZ3VyYXRpb24sREM9aW50cmEsREM9Y2FzY2FkZXRlY2gsREM9
-# b3JnP2NlcnRpZmljYXRlUmV2b2NhdGlvbkxpc3Q/YmFzZT9vYmplY3RDbGFzcz1j
-# UkxEaXN0cmlidXRpb25Qb2ludDCByQYIKwYBBQUHAQEEgbwwgbkwgbYGCCsGAQUF
-# BzAChoGpbGRhcDovLy9DTj1DVEEtSU5ULUNBLENOPUFJQSxDTj1QdWJsaWMlMjBL
-# ZXklMjBTZXJ2aWNlcyxDTj1TZXJ2aWNlcyxDTj1Db25maWd1cmF0aW9uLERDPWlu
-# dHJhLERDPWNhc2NhZGV0ZWNoLERDPW9yZz9jQUNlcnRpZmljYXRlP2Jhc2U/b2Jq
-# ZWN0Q2xhc3M9Y2VydGlmaWNhdGlvbkF1dGhvcml0eTBUBgNVHREETTBLoCwGCisG
-# AQQBgjcUAgOgHgwcbmVsc29uQGludHJhLmNhc2NhZGV0ZWNoLm9yZ4EbZWRlbi5u
-# ZWxzb25AY2FzY2FkZXRlY2gub3JnMA0GCSqGSIb3DQEBCwUAA4IBAQCbdFYwSLZQ
-# nXftd/4H6im6gtKTGi6yZ7e0kju+u9GQ/NSnGuHXta49Ayyltyh1N0GC7Yke1Q9c
-# f96wiyCyqoEgcas4La6nLdbL3Hv/Y1CLm0coPEPmMnTaC24HFJe2kaHEo8euiRCL
-# ohjNjifnKx5gx3KwlRShCjvD75zF3G0TH2gBAjUWZVaKpxrnqbWdS4+4g4tbjiGq
-# nrBGe0aItCTPGspkPCrrzvoRjHiTBAwD5cfABdBSeajq9Qt387JxKDbkyo/xPVyU
-# huE/jh6nB9SED4nASvuxJwG40LO/KBnjQqlS91QR3akz0lzrmBxFsuuj7Qd/1GwB
-# pA291YzWj2b+MYIElDCCBJACAQEwdTBeMRMwEQYKCZImiZPyLGQBGRYDb3JnMRsw
-# GQYKCZImiZPyLGQBGRYLY2FzY2FkZXRlY2gxFTATBgoJkiaJk/IsZAEZFgVpbnRy
-# YTETMBEGA1UEAxMKQ1RBLUlOVC1DQQITTQAACNTm6lyP5isnXwAAAAAI1DANBglg
-# hkgBZQMEAgEFAKBMMBkGCSqGSIb3DQEJAzEMBgorBgEEAYI3AgEEMC8GCSqGSIb3
-# DQEJBDEiBCCk3/h12I86XbNsrcXK5YdbkdwhBvtGroblIEYekfjKZzANBgkqhkiG
-# 9w0BAQEFAASCAQBMA+VziTaIxjbLrGlAYtthSmtePCCItxKKDgHfefHK7A/YnDeU
-# bsH++7/0UvYvqfqjP1jE3QCLSBwISNNRI6zYs639CFxzmu+jOZYQBd0op9WFTHac
-# e4U2a/RxSt9IFdRjzddSB1Zj/eldDCu/+GPBdR6+jcyt8HERiP5Ked7XjpeWjQqA
-# anenC1W9BTPFrrKWeGUmWVpl/IuAq82R6GKat60SX7LH10yoXR1h+n4MGKFeKyzl
-# eDmXDKIzhDnz9n779g+ggkKIg/Q2zHovZRcl9ZBStVJZeePf0BSNO/VaAX4ytTIe
-# Ibv1mGWUjMRRMdN9DCvWr6X9tahRiexC+1dhoYICojCCAp4GCSqGSIb3DQEJBjGC
-# Ao8wggKLAgEBMGgwUjELMAkGA1UEBhMCQkUxGTAXBgNVBAoTEEdsb2JhbFNpZ24g
-# bnYtc2ExKDAmBgNVBAMTH0dsb2JhbFNpZ24gVGltZXN0YW1waW5nIENBIC0gRzIC
-# EhEh1pmnZJc+8fhCfukZzFNBFDAJBgUrDgMCGgUAoIH9MBgGCSqGSIb3DQEJAzEL
-# BgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTE4MTAwODE4MTIxNlowIwYJKoZI
-# hvcNAQkEMRYEFCEVRNpcagoCZ9hRliPi4ROqPdaGMIGdBgsqhkiG9w0BCRACDDGB
-# jTCBijCBhzCBhAQUY7gvq2H1g5CWlQULACScUCkz7HkwbDBWpFQwUjELMAkGA1UE
-# BhMCQkUxGTAXBgNVBAoTEEdsb2JhbFNpZ24gbnYtc2ExKDAmBgNVBAMTH0dsb2Jh
-# bFNpZ24gVGltZXN0YW1waW5nIENBIC0gRzICEhEh1pmnZJc+8fhCfukZzFNBFDAN
-# BgkqhkiG9w0BAQEFAASCAQBeE5ZN6aymABRZuEeItouD6Wi7JqDcFLPcQJZfgPJn
-# XMQS82O6RltC7SpM9Wgk13HJbAu6jPfnskm3lWq3MFrWZfAbFGuLYkZSy9/4S3uX
-# Xoe6mGX0Z/tkNAkpwlq6uPAPsy/WmiYSp3UgypEBpe1puQvDZzqaWV4HA5lkJW2Q
-# i5g9qOnduSMWrd39z8ipOaMhDLO2PxTwKMOFiwcEYNdWkGIqNcDk1ksCTB+EI4kt
-# s6/Ljnnv6K+UunwiCQa9Tn5Hd1sFqFF01YCgdVfIew35W1jL7hXJlS7BVP+ltt6M
-# Ez7f+SFiXznaMIF8w9aXcQ1/F6Ead1sZ6k1dLsF+d52O
+# bFNpZ24gVGltZXN0YW1waW5nIENBIC0gRzICEhEh1pmnZJc+8fhCfukZzFNBFDAJ
+# BgUrDgMCGgUAoIH9MBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcN
+# AQkFMQ8XDTE5MDMyMjE2NDM1OFowIwYJKoZIhvcNAQkEMRYEFAZxOuD9GLroS5Qm
+# FyjYm3q2d0WTMIGdBgsqhkiG9w0BCRACDDGBjTCBijCBhzCBhAQUY7gvq2H1g5CW
+# lQULACScUCkz7HkwbDBWpFQwUjELMAkGA1UEBhMCQkUxGTAXBgNVBAoTEEdsb2Jh
+# bFNpZ24gbnYtc2ExKDAmBgNVBAMTH0dsb2JhbFNpZ24gVGltZXN0YW1waW5nIENB
+# IC0gRzICEhEh1pmnZJc+8fhCfukZzFNBFDANBgkqhkiG9w0BAQEFAASCAQCtaoOX
+# 4CQYakngdv4erCOnM9z5VxdNe1f6bG7kY+EfngmY2NgDpBKKu7/UqEaRyOBcxAdF
+# 0FFulc2PiorYPiTbwVRA8wwKUrz3d3XUbSwSR+oZJlHm0HQcT1DoBoNvMUv93P0p
+# hhZNSRsVG+JONp/sz2iUbfRwEdRQu5iUqZUB37kJ6XHDyjscdj/n9Y2r3UnJfrPr
+# hA9eGuR/ocqi4ou2vwUUupdiNznfAIMSsTEKk+LpfJ02KKp6uGUmRJKlqjGUv3rG
+# +4VkLKEkV9RW+sIFJ+KmXy+qTorqGH1S8M2aDBkB9RuBwyoNYkaqxvbPc0oBaTGQ
+# dSRPe5P5ETzpGh9j
 # SIG # End signature block
