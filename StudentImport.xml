@@ -1,0 +1,277 @@
+<?xml version="1.0"?>
+<Districts>
+	<District Name="EXAMPLE">
+		<Features>
+			<ExportSynergy>True</ExportSynergy>
+			<ExportSynergyLDAPAuth>False</ExportSynergyLDAPAuth>
+			<GoogleAccount>True</GoogleAccount>
+			<UserShare>True</UserShare>
+			<ADGroups>True</ADGroups>
+		</Features>
+		<CleanupFiles>
+			<File>Example_Email_Accounts.csv</File>
+			<File>StudentImport.log</File>
+			<File>Example High School.csv</File>
+			<File>Example Middle School.csv</File>
+			<File>Example Elementary School.csv</File>
+			<File>Student-Email-Export-Example.tsv</File>
+		</CleanupFiles>
+		<Notifications>
+			<SMTPServer/>
+			<From>StudentImport &lt;studentimport@Example.k12.or.us&gt;</From>
+			<Body>See the attached file for the usernames and email addresses of the imported students</Body>
+			<Subject>Example Student Import Information</Subject>
+			<Notification Name="Example High School">
+				<Recipient>jdoe@Example.k12.or.us</Recipient>
+			</Notification>
+			<Notification Name="Example Middle School">
+				<Recipient>jdoe@Example.k12.or.us</Recipient>
+			</Notification>
+			<Notification Name="Example Elementary School">
+				<Recipient>jdoe@Example.k12.or.us</Recipient>
+			</Notification>
+		</Notifications>
+		<WinSCP>
+			<DLLPath>WinSCP\WinSCPnet.dll</DLLPath>
+			<Host Name="SIS">
+				<HostName/>
+				<Download>
+					<PathLocal>Files\Example_Email_Accounts.csv</PathLocal>
+					<PathRemote>/EXAMPLE/Example_Email_Accounts.csv</PathRemote>
+				</Download>
+				<Upload>
+					<PathLocal>Files\Student-Email-Export-Example.tsv</PathLocal>
+					<PathRemote>/Upload/Student-Email-Export-Example.tsv</PathRemote>
+				</Upload>
+			</Host>
+		</WinSCP>
+		<GAM>
+			<EXEPath>GAM\gam.exe</EXEPath>
+			<Oauth2Path>GAM\Example.k12.or.us-oauth2.txt</Oauth2Path>
+		</GAM>
+		<UserConfig>
+			<ADGroupOU>OU=Student Groups,DC=Example,DC=k12,DC=or,DC=us</ADGroupOU>
+			<UPNSuffix>@Example.k12.or.us</UPNSuffix>
+			<EmailSuffix>@stu.Examplek12.org</EmailSuffix>
+			<NetBIOSDomainName>EXAMPLE</NetBIOSDomainName>
+			<AccountExpirationDate>31</AccountExpirationDate>
+			<Skip>
+				<Grades>
+					<Grade>PS</Grade>
+					<Grade>PK</Grade>
+				</Grades>
+				<Locations>
+					<Location>Example Charter School</Location>
+				</Locations>
+				<Students>
+					<Student/>
+				</Students>
+			</Skip>
+			<Locations>
+				<Location Name="Example High School">
+					<Path>OU=High School,OU=Students,DC=Example,DC=k12,DC=or,DC=us</Path>
+					<ScriptPath>student.bat</ScriptPath>
+					<HomeDrive>U:</HomeDrive>
+					<UserShare>
+						<Server>EXA-DATA-01</Server>
+						<DriveLetter>D</DriveLetter>
+						<PathOnDrive>Students</PathOnDrive>
+					</UserShare>
+				</Location>
+				<Location Name="Example Middle School">
+					<Path>OU=Middle School,OU=Students,DC=Example,DC=k12,DC=or,DC=us</Path>
+					<ScriptPath>student.bat</ScriptPath>
+					<HomeDrive>U:</HomeDrive>
+					<UserShare>
+						<Server>EXA-DATA-01</Server>
+						<DriveLetter>D</DriveLetter>
+						<PathOnDrive>Students</PathOnDrive>
+					</UserShare>
+				</Location>
+				<Location Name="Example Petersen Elementary">
+					<Path>OU=Elementary School,OU=Students,DC=Example,DC=k12,DC=or,DC=us</Path>
+					<ScriptPath>student.bat</ScriptPath>
+					<HomeDrive>U:</HomeDrive>
+					<UserShare>
+						<Server>EXA-DATA-01</Server>
+						<DriveLetter>D</DriveLetter>
+						<PathOnDrive>Students</PathOnDrive>
+					</UserShare>
+				</Location>
+				<Location Name="Disabled">
+					<Path>OU=Students,OU=Disabled Accounts,DC=example,DC=k12,DC=or,DC=us</Path>
+				</Location>
+			</Locations>
+			<Password>
+				<ChangePasswordAtNextLogon>True</ChangePasswordAtNextLogon>
+				<PasswordNeverExpires>False</PasswordNeverExpires>
+				<CannotChangePassword>False</CannotChangePassword>
+				<UseDefaultPassword>False</UseDefaultPassword>
+				<DefaultPassword>False</DefaultPassword>
+				<DefaultPasswordIsStudentID>False</DefaultPasswordIsStudentID>
+				<DOBPasswordGrade>03</DOBPasswordGrade>
+				<DOBPasswordLocations>
+					<Location>None</Location>
+				</DOBPasswordLocations>
+				<SpecialCharacters>
+					<Character>@</Character>
+					<Character>#</Character>
+					<Character>%</Character>
+					<Character>&gt;</Character>
+				</SpecialCharacters>
+				<Numbers>
+					<Number>3</Number>
+					<Number>4</Number>
+					<Number>5</Number>
+					<Number>6</Number>
+					<Number>7</Number>
+					<Number>9</Number>
+				</Numbers>
+				<Words>
+					<word>avocado</word>
+					<word>banana</word>
+					<word>coconut</word>
+					<word>durian</word>
+					<word>elderberry</word>
+				</Words>
+			</Password>
+		</UserConfig>
+	</District>
+	<District Name="EXAMPLE2">
+		<Features>
+			<ExportSynergy>True</ExportSynergy>
+			<ExportSynergyLDAPAuth>False</ExportSynergyLDAPAuth>
+			<GoogleAccount>True</GoogleAccount>
+			<UserShare>True</UserShare>
+			<ADGroups>True</ADGroups>
+		</Features>
+		<CleanupFiles>
+			<File>Example_Email_Accounts.csv</File>
+			<File>StudentImport.log</File>
+			<File>Example High School.csv</File>
+			<File>Example Middle School.csv</File>
+			<File>Example Elementary School.csv</File>
+			<File>Student-Email-Export-Example.tsv</File>
+		</CleanupFiles>
+		<Notifications>
+			<SMTPServer/>
+			<From>StudentImport &lt;studentimport@Example.k12.or.us&gt;</From>
+			<Body>See the attached file for the usernames and email addresses of the imported students</Body>
+			<Subject>Example Student Import Information</Subject>
+			<Notification Name="Example High School">
+				<Recipient>jdoe@Example.k12.or.us</Recipient>
+			</Notification>
+			<Notification Name="Example Middle School">
+				<Recipient>jdoe@Example.k12.or.us</Recipient>
+			</Notification>
+			<Notification Name="Example Elementary School">
+				<Recipient>jdoe@Example.k12.or.us</Recipient>
+			</Notification>
+		</Notifications>
+		<WinSCP>
+			<DLLPath>WinSCP\WinSCPnet.dll</DLLPath>
+			<Host Name="SIS">
+				<HostName/>
+				<Download>
+					<PathLocal>Files\Example_Email_Accounts.csv</PathLocal>
+					<PathRemote>/EXAMPLE/Example_Email_Accounts.csv</PathRemote>
+				</Download>
+				<Upload>
+					<PathLocal>Files\Student-Email-Export-Example.tsv</PathLocal>
+					<PathRemote>/Upload/Student-Email-Export-Example.tsv</PathRemote>
+				</Upload>
+			</Host>
+		</WinSCP>
+		<GAM>
+			<EXEPath>GAM\gam.exe</EXEPath>
+			<Oauth2Path>GAM\Example.k12.or.us-oauth2.txt</Oauth2Path>
+		</GAM>
+		<UserConfig>
+			<ADGroupOU>OU=Student Groups,DC=Example,DC=k12,DC=or,DC=us</ADGroupOU>
+			<UPNSuffix>@Example.k12.or.us</UPNSuffix>
+			<EmailSuffix>@stu.Examplek12.org</EmailSuffix>
+			<NetBIOSDomainName>EXAMPLE</NetBIOSDomainName>
+			<AccountExpirationDate>31</AccountExpirationDate>
+			<Skip>
+				<Grades>
+					<Grade>PS</Grade>
+					<Grade>PK</Grade>
+				</Grades>
+				<Locations>
+					<Location>Example Charter School</Location>
+				</Locations>
+				<Students>
+					<Student/>
+				</Students>
+			</Skip>
+			<Locations>
+				<Location Name="Example High School">
+					<Path>OU=High School,OU=Students,DC=Example,DC=k12,DC=or,DC=us</Path>
+					<ScriptPath>student.bat</ScriptPath>
+					<HomeDrive>U:</HomeDrive>
+					<UserShare>
+						<Server>EXA-DATA-01</Server>
+						<DriveLetter>D</DriveLetter>
+						<PathOnDrive>Students</PathOnDrive>
+					</UserShare>
+				</Location>
+				<Location Name="Example Middle School">
+					<Path>OU=Middle School,OU=Students,DC=Example,DC=k12,DC=or,DC=us</Path>
+					<ScriptPath>student.bat</ScriptPath>
+					<HomeDrive>U:</HomeDrive>
+					<UserShare>
+						<Server>EXA-DATA-01</Server>
+						<DriveLetter>D</DriveLetter>
+						<PathOnDrive>Students</PathOnDrive>
+					</UserShare>
+				</Location>
+				<Location Name="Example Petersen Elementary">
+					<Path>OU=Elementary School,OU=Students,DC=Example,DC=k12,DC=or,DC=us</Path>
+					<ScriptPath>student.bat</ScriptPath>
+					<HomeDrive>U:</HomeDrive>
+					<UserShare>
+						<Server>EXA-DATA-01</Server>
+						<DriveLetter>D</DriveLetter>
+						<PathOnDrive>Students</PathOnDrive>
+					</UserShare>
+				</Location>
+				<Location Name="Disabled">
+					<Path>OU=Students,OU=Disabled Accounts,DC=example,DC=k12,DC=or,DC=us</Path>
+				</Location>
+			</Locations>
+			<Password>
+				<ChangePasswordAtNextLogon>True</ChangePasswordAtNextLogon>
+				<PasswordNeverExpires>False</PasswordNeverExpires>
+				<CannotChangePassword>False</CannotChangePassword>
+				<UseDefaultPassword>False</UseDefaultPassword>
+				<DefaultPassword>False</DefaultPassword>
+				<DefaultPasswordIsStudentID>False</DefaultPasswordIsStudentID>
+				<DOBPasswordGrade>03</DOBPasswordGrade>
+				<DOBPasswordLocations>
+					<Location>None</Location>
+				</DOBPasswordLocations>
+				<SpecialCharacters>
+					<Character>@</Character>
+					<Character>#</Character>
+					<Character>%</Character>
+					<Character>&gt;</Character>
+				</SpecialCharacters>
+				<Numbers>
+					<Number>3</Number>
+					<Number>4</Number>
+					<Number>5</Number>
+					<Number>6</Number>
+					<Number>7</Number>
+					<Number>9</Number>
+				</Numbers>
+				<Words>
+					<word>avocado</word>
+					<word>banana</word>
+					<word>coconut</word>
+					<word>durian</word>
+					<word>elderberry</word>
+				</Words>
+			</Password>
+		</UserConfig>
+	</District>
+</Districts>
